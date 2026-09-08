@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="GUL HOUSE, hunian kos premium siap huni dengan kamar nyaman, fasilitas terawat, dan proses booking mudah.">
     <title><?= html_escape($title); ?></title>
+    <link rel="preload" as="image" href="https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1500&q=76" fetchpriority="high">
+    <link rel="preconnect" href="https://images.unsplash.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -13,10 +15,16 @@
 </head>
 <body>
     <header class="site-header" id="top">
-        <a class="brand" href="<?= base_url(); ?>" aria-label="GUL HOUSE">
+        <div class="page-progress" data-page-progress aria-hidden="true"></div>
+        <a class="brand" href="<?= base_url(); ?>">
             <span class="brand-mark">GH</span>
             <span>GUL HOUSE</span>
         </a>
+        <button type="button" class="menu-toggle" data-menu-toggle aria-expanded="false" aria-label="Buka navigasi">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
         <nav class="nav-links" aria-label="Navigasi utama">
             <a href="#rooms">Kamar</a>
             <a href="#facilities">Fasilitas</a>
@@ -29,7 +37,12 @@
     </header>
 
     <main>
-        <section class="hero" data-parallax data-parallax-speed="0.28">
+        <section class="hero" data-hero-slider>
+            <div class="hero-slides" aria-hidden="true">
+                <div class="hero-slide is-active" style="--hero-image: url('https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1500&q=76');"></div>
+                <div class="hero-slide" style="--hero-image: url('https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=1500&q=76');"></div>
+                <div class="hero-slide" style="--hero-image: url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1500&q=76');"></div>
+            </div>
             <div class="hero-copy reveal">
                 <p class="eyebrow">Kos premium siap huni</p>
                 <h1>GUL HOUSE</h1>
@@ -38,8 +51,13 @@
                     <a class="btn btn-primary glow-button" href="#booking">Booking Survey</a>
                     <a class="btn btn-ghost" href="https://wa.me/6280000000000" target="_blank" rel="noopener">WhatsApp</a>
                 </div>
+                <div class="hero-badges" role="list" aria-label="Ringkasan layanan">
+                    <span role="listitem">Survey terjadwal</span>
+                    <span role="listitem">Harga bulanan jelas</span>
+                    <span role="listitem">Data kamar dari master</span>
+                </div>
             </div>
-            <div class="hero-panel reveal delay-1" aria-label="Ringkasan ketersediaan">
+            <div class="hero-panel reveal delay-1" role="group" aria-label="Ringkasan ketersediaan">
                 <div class="lottie-row">
                     <span>Live Availability</span>
                     <span id="availability-lottie" class="lottie-badge" aria-hidden="true"></span>
@@ -56,6 +74,28 @@
                     <span>Mulai Dari</span>
                     <strong>Rp <?= number_format((int) $summary['starting_price'], 0, ',', '.'); ?></strong>
                 </div>
+            </div>
+            <div class="hero-slider-ui reveal delay-2">
+                <div class="hero-progress" data-hero-progress><span></span></div>
+                <div class="hero-dots" data-hero-dots role="group" aria-label="Foto utama"></div>
+            </div>
+        </section>
+
+        <section class="trust-strip" aria-label="Keunggulan GUL HOUSE">
+            <div class="reveal">
+                <span>01</span>
+                <strong>Foto & tipe jelas</strong>
+                <p>Calon penghuni melihat pilihan berdasarkan gedung dan tipe kamar, bukan nomor internal.</p>
+            </div>
+            <div class="reveal delay-1">
+                <span>02</span>
+                <strong>Survey cepat</strong>
+                <p>Form booking dibuat ringkas agar admin bisa langsung follow up jadwal survey.</p>
+            </div>
+            <div class="reveal delay-2">
+                <span>03</span>
+                <strong>Harga transparan</strong>
+                <p>Range harga dan estimasi biaya awal tampil sebelum calon penghuni bertanya.</p>
             </div>
         </section>
 
@@ -91,6 +131,32 @@
                         <strong>Rp <?= number_format((int) $type['price_from'], 0, ',', '.'); ?></strong>
                         <p><?= (int) $type['available_count']; ?> tersedia dari <?= (int) $type['total_rooms']; ?> kamar</p>
                     </article>
+                <?php endforeach; ?>
+            </div>
+        </section>
+
+        <section class="section availability-insight">
+            <div class="section-copy reveal">
+                <p class="eyebrow">Snapshot</p>
+                <h2>Stok kamar kebaca dalam sekali lihat.</h2>
+                <p>Calon penghuni bisa memilih dari tipe tersedia, lalu lanjut ke detail tanpa melihat nomor kamar yang dipakai untuk operasional master.</p>
+            </div>
+            <div class="insight-panel reveal delay-1">
+                <?php foreach (array_slice($property_stats, 0, 4) as $index => $stat): ?>
+                    <?php
+                        $totalRooms = max(1, (int) $stat['total_rooms']);
+                        $availableRooms = (int) $stat['available_count'];
+                        $availableRate = min(100, max(0, round(($availableRooms / $totalRooms) * 100)));
+                    ?>
+                    <div class="insight-row">
+                        <div>
+                            <strong><?= html_escape($stat['property_name']); ?></strong>
+                            <span><?= $availableRooms; ?> tersedia dari <?= $totalRooms; ?> kamar</span>
+                        </div>
+                        <div class="insight-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= $availableRate; ?>" aria-label="<?= $availableRate; ?> persen tersedia">
+                            <span style="width: <?= $availableRate; ?>%;"></span>
+                        </div>
+                    </div>
                 <?php endforeach; ?>
             </div>
         </section>
@@ -132,6 +198,10 @@
                         </div>
                     </article>
                 <?php endforeach; ?>
+                <div class="room-empty-state" data-room-empty aria-hidden="true">
+                    <strong>Belum ada tipe yang cocok</strong>
+                    <span>Coba pilih filter lain atau langsung booking survey agar admin bantu carikan opsi terdekat.</span>
+                </div>
             </div>
         </section>
 
@@ -141,7 +211,7 @@
                     <p class="eyebrow">Pilihan tersedia</p>
                     <h2>Gedung dan tipe yang bisa disurvey.</h2>
                 </div>
-                <div class="carousel-controls" aria-label="Kontrol carousel">
+                <div class="carousel-controls" role="group" aria-label="Kontrol carousel">
                     <button type="button" class="carousel-btn" data-carousel-prev aria-label="Kamar sebelumnya">&lsaquo;</button>
                     <button type="button" class="carousel-btn" data-carousel-next aria-label="Kamar berikutnya">&rsaquo;</button>
                 </div>
@@ -162,7 +232,33 @@
                     </article>
                 <?php endforeach; ?>
             </div>
-            <div class="carousel-dots" data-carousel-dots aria-label="Posisi carousel"></div>
+            <div class="carousel-dots" data-carousel-dots role="group" aria-label="Posisi carousel"></div>
+        </section>
+
+        <section class="section photo-preview-section">
+            <div class="section-copy reveal">
+                <p class="eyebrow">Preview foto</p>
+                <h2>Nuansa kamar, area santai, dan living space.</h2>
+                <p>Bagian ini disiapkan untuk galeri foto asli GUL HOUSE. Untuk sekarang tampilannya memakai preview visual agar flow UI-nya sudah kebaca dari awal.</p>
+            </div>
+            <div class="preview-mosaic reveal delay-1">
+                <figure class="preview-large">
+                    <img src="https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=980&q=74" alt="Preview kamar GUL HOUSE" loading="lazy" decoding="async">
+                    <figcaption>Kamar siap huni</figcaption>
+                </figure>
+                <figure>
+                    <img src="https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=620&q=74" alt="Preview ruang tidur GUL HOUSE" loading="lazy" decoding="async">
+                    <figcaption>Ruang tidur</figcaption>
+                </figure>
+                <figure>
+                    <img src="https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=620&q=74" alt="Preview fasilitas GUL HOUSE" loading="lazy" decoding="async">
+                    <figcaption>Fasilitas kamar</figcaption>
+                </figure>
+                <figure>
+                    <img src="https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=620&q=74" alt="Preview area bersama GUL HOUSE" loading="lazy" decoding="async">
+                    <figcaption>Area bersama</figcaption>
+                </figure>
+            </div>
         </section>
 
         <section class="section facilities" id="facilities">
@@ -230,7 +326,7 @@
 
         <section class="section location-section" id="location">
             <div class="location-map reveal">
-                <div class="map-pin" aria-label="Lokasi GUL HOUSE"></div>
+                <div class="map-pin" role="img" aria-label="Lokasi GUL HOUSE"></div>
             </div>
             <div class="location-copy reveal delay-1">
                 <p class="eyebrow">Lokasi</p>
@@ -243,6 +339,35 @@
                         </div>
                     <?php endforeach; ?>
                 </div>
+            </div>
+        </section>
+
+        <section class="section process-section">
+            <div class="section-copy reveal">
+                <p class="eyebrow">Alur booking</p>
+                <h2>Dari lihat tipe sampai jadwal survey.</h2>
+            </div>
+            <div class="process-grid">
+                <article class="process-card reveal">
+                    <span>1</span>
+                    <h3>Pilih tipe</h3>
+                    <p>Lihat gedung, tipe kamar, jumlah tersedia, dan range harga bulanan.</p>
+                </article>
+                <article class="process-card reveal delay-1">
+                    <span>2</span>
+                    <h3>Kirim booking</h3>
+                    <p>Isi nama, WhatsApp, minat kamar, dan rencana masuk.</p>
+                </article>
+                <article class="process-card reveal delay-2">
+                    <span>3</span>
+                    <h3>Survey</h3>
+                    <p>Admin mengatur jadwal survey dan mengunci opsi kamar yang paling cocok.</p>
+                </article>
+                <article class="process-card reveal delay-3">
+                    <span>4</span>
+                    <h3>Masuk</h3>
+                    <p>Konfirmasi pembayaran awal, serah terima, lalu kamar siap ditempati.</p>
+                </article>
             </div>
         </section>
 
@@ -342,7 +467,6 @@
         <a href="https://wa.me/6280000000000" target="_blank" rel="noopener">WhatsApp</a>
         <a href="#booking">Booking</a>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
-    <script src="<?= base_url('assets/landing/js/landing.js'); ?>"></script>
+    <script defer src="<?= base_url('assets/landing/js/landing.js'); ?>"></script>
 </body>
 </html>

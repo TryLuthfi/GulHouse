@@ -13,6 +13,23 @@ class Landing_model extends CI_Model
             'starting_price' => 1500000,
         );
 
+        if ($this->table_exists('gh_rooms')) {
+            $row = $this->db
+                ->select('COUNT(id) AS total_rooms', FALSE)
+                ->select('SUM(CASE WHEN monthly_price IS NOT NULL AND status = "available" AND is_public = 1 THEN 1 ELSE 0 END) AS available_rooms', FALSE)
+                ->select('MIN(CASE WHEN monthly_price IS NOT NULL AND status = "available" AND is_public = 1 THEN monthly_price END) AS starting_price', FALSE)
+                ->get('gh_rooms')
+                ->row_array();
+
+            return array(
+                'total_rooms' => (int) $row['total_rooms'],
+                'available_rooms' => (int) $row['available_rooms'],
+                'occupied_rooms' => 0,
+                'occupancy_rate' => 0,
+                'starting_price' => isset($row['starting_price']) ? (int) $row['starting_price'] : $fallback['starting_price'],
+            );
+        }
+
         if ($this->table_exists('gh_room_database')) {
             $row = $this->db
                 ->select('COUNT(id) AS total_rooms', FALSE)
@@ -50,6 +67,27 @@ class Landing_model extends CI_Model
 
     public function get_room_types()
     {
+        if ($this->table_exists('gh_rooms')) {
+            $rows = $this->db
+                ->select('CONCAT(p.code, " - ", rt.name) AS name', FALSE)
+                ->select('p.code AS property_code', FALSE)
+                ->select('rt.name AS room_type', FALSE)
+                ->select('COUNT(r.id) AS total_rooms', FALSE)
+                ->select('MIN(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN r.monthly_price END) AS price_from', FALSE)
+                ->select('SUM(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN 1 ELSE 0 END) AS available_count', FALSE)
+                ->from('gh_rooms r')
+                ->join('gh_properties p', 'p.id = r.property_id', 'left')
+                ->join('gh_room_types rt', 'rt.id = r.room_type_id', 'left')
+                ->group_by('p.id, rt.id')
+                ->order_by('p.code', 'ASC')
+                ->order_by('FIELD(rt.name, "Standart", "Deluxe", "VIP")', '', FALSE)
+                ->order_by('rt.name', 'ASC')
+                ->get()
+                ->result_array();
+
+            return $rows ? $rows : $this->fallback_room_types();
+        }
+
         if ($this->table_exists('gh_room_database')) {
             $rows = $this->db
                 ->select('CONCAT(property_code, " - ", room_type) AS name', FALSE)
@@ -85,6 +123,10 @@ class Landing_model extends CI_Model
 
     public function get_featured_rooms()
     {
+        if ($this->table_exists('gh_rooms')) {
+            return $this->get_public_master_room_type_cards();
+        }
+
         if ($this->table_exists('gh_room_database')) {
             return $this->get_public_room_type_cards();
         }
@@ -113,6 +155,10 @@ class Landing_model extends CI_Model
 
     public function get_all_public_rooms()
     {
+        if ($this->table_exists('gh_rooms')) {
+            return $this->get_public_master_room_type_cards();
+        }
+
         if ($this->table_exists('gh_room_database')) {
             return $this->get_public_room_type_cards();
         }
@@ -192,6 +238,18 @@ class Landing_model extends CI_Model
 
     public function get_property_stats()
     {
+        if ($this->table_exists('gh_rooms')) {
+            return $this->db
+                ->select('p.code AS property_name, COUNT(r.id) AS total_rooms', FALSE)
+                ->select('SUM(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN 1 ELSE 0 END) AS available_count', FALSE)
+                ->from('gh_properties p')
+                ->join('gh_rooms r', 'r.property_id = p.id', 'left')
+                ->group_by('p.id')
+                ->order_by('p.code', 'ASC')
+                ->get()
+                ->result_array();
+        }
+
         if ($this->table_exists('gh_room_database')) {
             return $this->db
                 ->select('property_code AS property_name, COUNT(id) AS total_rooms', FALSE)
@@ -227,7 +285,8 @@ class Landing_model extends CI_Model
             return FALSE;
         }
 
-        foreach ($this->get_public_room_type_cards() as $card) {
+        $cards = $this->table_exists('gh_rooms') ? $this->get_public_master_room_type_cards() : $this->get_public_room_type_cards();
+        foreach ($cards as $card) {
             if ($card['slug'] === $slug) {
                 return $this->normalize_public_room_type_detail($card);
             }
@@ -320,7 +379,8 @@ class Landing_model extends CI_Model
     public function get_similar_room_types(array $room)
     {
         $similar = array();
-        foreach ($this->get_public_room_type_cards() as $card) {
+        $cards = $this->table_exists('gh_rooms') ? $this->get_public_master_room_type_cards() : $this->get_public_room_type_cards();
+        foreach ($cards as $card) {
             if (isset($room['slug']) && $card['slug'] === $room['slug']) {
                 continue;
             }
@@ -335,7 +395,7 @@ class Landing_model extends CI_Model
         }
 
         if (count($similar) < 3) {
-            foreach ($this->get_public_room_type_cards() as $card) {
+            foreach ($cards as $card) {
                 if (isset($room['slug']) && $card['slug'] === $room['slug']) {
                     continue;
                 }
@@ -522,6 +582,47 @@ class Landing_model extends CI_Model
             ->order_by('property_code', 'ASC')
             ->order_by('FIELD(room_type, "Standart", "Deluxe", "VIP")', '', FALSE)
             ->order_by('room_type', 'ASC')
+            ->get()
+            ->result_array();
+
+        $cards = array();
+        foreach ($rows as $index => $row) {
+            $cards[] = array(
+                'id' => $index + 1,
+                'code' => $row['property_code'],
+                'name' => $row['property_code'] . ' - ' . $row['type_name'],
+                'slug' => $this->create_public_room_slug($row['property_code'], $row['type_name']),
+                'price' => (int) $row['price'],
+                'max_price' => (int) $row['max_price'],
+                'status' => ((int) $row['available_count'] > 0) ? 'available' : 'maintenance',
+                'type_name' => $row['type_name'],
+                'total_rooms' => (int) $row['total_rooms'],
+                'available_count' => (int) $row['available_count'],
+                'deposit_estimate' => (int) $row['deposit_estimate'],
+            );
+        }
+
+        return $cards ? $cards : $this->fallback_public_room_type_cards();
+    }
+
+    private function get_public_master_room_type_cards()
+    {
+        $rows = $this->db
+            ->select('p.code AS property_code', FALSE)
+            ->select('rt.name AS type_name', FALSE)
+            ->select('COUNT(r.id) AS total_rooms', FALSE)
+            ->select('SUM(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN 1 ELSE 0 END) AS available_count', FALSE)
+            ->select('MIN(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN r.monthly_price END) AS price', FALSE)
+            ->select('MAX(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN r.monthly_price END) AS max_price', FALSE)
+            ->select('MIN(CASE WHEN r.deposit IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN r.deposit END) AS deposit_estimate', FALSE)
+            ->from('gh_rooms r')
+            ->join('gh_properties p', 'p.id = r.property_id', 'left')
+            ->join('gh_room_types rt', 'rt.id = r.room_type_id', 'left')
+            ->group_by('p.id, rt.id')
+            ->having('available_count >', 0)
+            ->order_by('p.code', 'ASC')
+            ->order_by('FIELD(rt.name, "Standart", "Deluxe", "VIP")', '', FALSE)
+            ->order_by('rt.name', 'ASC')
             ->get()
             ->result_array();
 
