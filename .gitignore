@@ -1,7 +1,6 @@
 *.log
 *.tmp
 .env
-!/landing/.env
 /vendor/
 /node_modules/
 /.idea/
