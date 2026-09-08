@@ -8,6 +8,36 @@
         }
     }
 
+    function initDetailStickyBar() {
+        var stickyBar = document.querySelector('[data-detail-sticky]');
+        var hero = document.querySelector('.detail-hero');
+
+        if (!stickyBar || !hero) {
+            return;
+        }
+
+        var ticking = false;
+
+        function update() {
+            var rect = hero.getBoundingClientRect();
+            var visible = rect.bottom <= 96;
+            stickyBar.classList.toggle('is-visible', visible);
+            stickyBar.setAttribute('aria-hidden', visible ? 'false' : 'true');
+            ticking = false;
+        }
+
+        function requestUpdate() {
+            if (!ticking) {
+                window.requestAnimationFrame(update);
+                ticking = true;
+            }
+        }
+
+        window.addEventListener('scroll', requestUpdate, { passive: true });
+        window.addEventListener('resize', requestUpdate);
+        update();
+    }
+
     function initReveal() {
         var items = document.querySelectorAll('.reveal');
 
@@ -433,6 +463,7 @@
     initCarousel();
     initAccordion();
     initLottie();
+    initDetailStickyBar();
     initPhotoModal();
     initRoomFilter();
 }());

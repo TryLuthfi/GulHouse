@@ -46,9 +46,14 @@ class Home extends CI_Controller
         redirect(base_url('#booking'));
     }
 
-    public function room($id = null)
+    public function room($slug = null)
     {
-        $room = $this->Landing_model->get_room_detail((int) $id);
+        if (is_numeric($slug)) {
+            redirect(base_url('#rooms'));
+            return;
+        }
+
+        $room = $this->Landing_model->get_room_type_detail((string) $slug);
 
         if ( ! $room) {
             show_404();
@@ -56,10 +61,10 @@ class Home extends CI_Controller
         }
 
         $data = array(
-            'title' => $room['code'] . ' - ' . $room['name'] . ' | GUL HOUSE',
+            'title' => $room['name'] . ' | GUL HOUSE',
             'room' => $room,
             'gallery' => $this->Landing_model->get_room_gallery($room),
-            'similar_rooms' => $this->Landing_model->get_similar_rooms($room),
+            'similar_rooms' => $this->Landing_model->get_similar_room_types($room),
         );
 
         $this->load->view('room_detail', $data);

@@ -27,6 +27,18 @@
         <a class="header-action" href="<?= base_url('#booking'); ?>">Cek Kamar</a>
     </header>
 
+    <div class="detail-sticky-bar" data-detail-sticky aria-hidden="true">
+        <div>
+            <span><?= html_escape($room['code']); ?></span>
+            <strong><?= html_escape($room['name']); ?></strong>
+        </div>
+        <div>
+            <span><?= (int) $room['available_count']; ?> tersedia</span>
+            <strong><?= html_escape($room['price_label']); ?></strong>
+            <a href="<?= base_url('#booking'); ?>">Booking</a>
+        </div>
+    </div>
+
     <main>
         <section class="detail-hero">
             <div class="detail-title reveal">
@@ -36,8 +48,8 @@
                 <p><?= html_escape($room['public_description']); ?></p>
             </div>
             <aside class="detail-booking-card reveal delay-1">
-                <span><?= html_escape($room['type_name']); ?></span>
-                <strong>Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?></strong>
+                <span><?= (int) $room['available_count']; ?> tersedia dari <?= (int) $room['total_rooms']; ?> kamar</span>
+                <strong><?= html_escape($room['price_label']); ?></strong>
                 <p>Estimasi deposit Rp <?= number_format((int) $room['deposit_estimate'], 0, ',', '.'); ?></p>
                 <a class="btn btn-primary glow-button" href="<?= base_url('#booking'); ?>">Booking Survey</a>
             </aside>
@@ -59,11 +71,11 @@
 
         <section class="section detail-content">
             <article class="detail-copy reveal">
-                <p class="eyebrow">Detail kamar</p>
+                <p class="eyebrow">Detail tipe kamar</p>
                 <h2><?= html_escape($room['type_name']); ?> di <?= html_escape($room['code']); ?></h2>
                 <p><?= html_escape($room['type_description']); ?></p>
                 <div class="detail-points">
-                    <div><strong>Status</strong><span><?= html_escape(ucfirst($room['status'])); ?></span></div>
+                    <div><strong>Tersedia</strong><span><?= (int) $room['available_count']; ?> kamar</span></div>
                     <div><strong>Periode</strong><span>Sewa bulanan</span></div>
                     <div><strong>Survey</strong><span>By appointment</span></div>
                 </div>
@@ -94,7 +106,7 @@
             <div class="cost-grid detail-cost-grid">
                 <div class="cost-card reveal">
                     <span>Sewa bulan pertama</span>
-                    <strong>Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?></strong>
+                    <strong><?= html_escape($room['price_label']); ?></strong>
                 </div>
                 <div class="cost-card reveal delay-1">
                     <span>Deposit</span>
@@ -124,16 +136,16 @@
                 </div>
                 <div class="accordion-item">
                     <button type="button" class="accordion-trigger" aria-expanded="false">
-                        Apakah foto akan memakai foto asli?
+                        Apakah foto akan memakai foto asli per tipe?
                         <span></span>
                     </button>
                     <div class="accordion-panel">
-                        <p>Struktur galeri sudah siap. Foto contoh ini bisa diganti dari upload master per kamar saat modul admin dibuat.</p>
+                        <p>Struktur galeri sudah siap. Foto contoh ini bisa diganti dari upload master per gedung, tipe, atau kamar saat modul admin dibuat.</p>
                     </div>
                 </div>
                 <div class="accordion-item">
                     <button type="button" class="accordion-trigger" aria-expanded="false">
-                        Bagaimana cara booking kamar ini?
+                        Bagaimana cara booking tipe ini?
                         <span></span>
                     </button>
                     <div class="accordion-panel">
@@ -146,7 +158,7 @@
         <section class="room-carousel-section reveal">
             <div class="carousel-heading">
                 <div>
-                    <p class="eyebrow">Kamar lain</p>
+                    <p class="eyebrow">Tipe lain</p>
                     <h2>Pilihan serupa.</h2>
                 </div>
             </div>
@@ -158,7 +170,7 @@
                             <span><?= html_escape($similar['code']); ?></span>
                             <h3><?= html_escape($similar['name']); ?></h3>
                             <p><?= html_escape($similar['type_name']); ?> mulai Rp <?= number_format((int) $similar['price'], 0, ',', '.'); ?>/bulan</p>
-                            <a href="<?= base_url('rooms/' . (int) $similar['id']); ?>">Lihat detail</a>
+                            <a href="<?= base_url('rooms/' . html_escape($similar['slug'])); ?>">Lihat detail</a>
                         </div>
                     </article>
                 <?php endforeach; ?>

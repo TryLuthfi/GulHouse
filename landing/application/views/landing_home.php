@@ -81,8 +81,8 @@
         <section class="section split" id="rooms">
             <div class="section-copy reveal">
                 <p class="eyebrow">Ketersediaan</p>
-                <h2>Pilih tipe kamar yang paling pas.</h2>
-                <p>Data di bawah mengambil status kamar dari database saat tersedia. Owner tetap bisa mengatur kamar mana yang ingin dipublikasikan saat modul master sudah dipisah.</p>
+                <h2>Pilih gedung dan tipe kamar yang paling pas.</h2>
+                <p>Landing page menampilkan ringkasan per gedung dan jenis kamar. Nomor kamar disimpan untuk kebutuhan master agar calon penghuni cukup memilih tipe yang diinginkan.</p>
             </div>
             <div class="type-grid">
                 <?php foreach ($room_types as $index => $type): ?>
@@ -98,14 +98,16 @@
         <section class="section room-browser reveal" id="availability">
             <div class="browser-head">
                 <div>
-                    <p class="eyebrow">Daftar kamar</p>
-                    <h2>Cek kamar sebelum tanya admin.</h2>
+                    <p class="eyebrow">Jenis kamar</p>
+                    <h2>Cek gedung dan tipe sebelum tanya admin.</h2>
                 </div>
                 <div class="room-filter" data-room-filter>
                     <button type="button" class="is-active" data-filter="all">Semua</button>
                     <button type="button" data-filter="available">Tersedia</button>
                     <button type="button" data-filter="GH 1">GH 1</button>
                     <button type="button" data-filter="GH 2">GH 2</button>
+                    <button type="button" data-filter="Standart">Standart</button>
+                    <button type="button" data-filter="Deluxe">Deluxe</button>
                     <button type="button" data-filter="VIP">VIP</button>
                 </div>
             </div>
@@ -114,13 +116,19 @@
                     <article class="compact-room reveal delay-<?= ($index % 4); ?>" data-room-card data-status="<?= html_escape($room['status']); ?>" data-property="<?= html_escape($room['code']); ?>" data-type="<?= html_escape($room['type_name']); ?>">
                         <div class="compact-photo photo-<?= ($index % 3) + 1; ?>"></div>
                         <div>
-                            <span><?= html_escape($room['code']); ?></span>
+                            <span><?= (int) $room['available_count']; ?> tersedia dari <?= (int) $room['total_rooms']; ?> kamar</span>
                             <h3><?= html_escape($room['name']); ?></h3>
-                            <p><?= html_escape($room['type_name']); ?> - Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?>/bulan</p>
+                            <p>
+                                <?= html_escape($room['code']); ?> -
+                                Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?>
+                                <?php if ((int) $room['max_price'] > (int) $room['price']): ?>
+                                    - Rp <?= number_format((int) $room['max_price'], 0, ',', '.'); ?>
+                                <?php endif; ?>/bulan
+                            </p>
                         </div>
                         <div class="compact-actions">
                             <span class="status-pill status-<?= html_escape($room['status']); ?>"><?= html_escape(ucfirst($room['status'])); ?></span>
-                            <a href="<?= base_url('rooms/' . (int) $room['id']); ?>">Detail</a>
+                            <a href="<?= base_url('rooms/' . html_escape($room['slug'])); ?>">Detail</a>
                         </div>
                     </article>
                 <?php endforeach; ?>
@@ -131,7 +139,7 @@
             <div class="carousel-heading">
                 <div>
                     <p class="eyebrow">Pilihan tersedia</p>
-                    <h2>Kamar yang bisa disurvey.</h2>
+                    <h2>Gedung dan tipe yang bisa disurvey.</h2>
                 </div>
                 <div class="carousel-controls" aria-label="Kontrol carousel">
                     <button type="button" class="carousel-btn" data-carousel-prev aria-label="Kamar sebelumnya">&lsaquo;</button>
@@ -145,10 +153,10 @@
                         <div class="room-body">
                             <span><?= html_escape($room['code']); ?></span>
                             <h3><?= html_escape($room['name']); ?></h3>
-                            <p><?= html_escape($room['type_name']); ?> mulai Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?>/bulan</p>
+                            <p><?= (int) $room['available_count']; ?> kamar tersedia, mulai Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?>/bulan</p>
                             <div class="room-links">
-                                <a href="<?= base_url('rooms/' . (int) (isset($room['id']) ? $room['id'] : ($index + 1))); ?>">Lihat detail</a>
-                                <a href="#booking">Booking</a>
+                                <a href="<?= base_url('rooms/' . html_escape($room['slug'])); ?>">Lihat detail</a>
+                                <a href="#booking">Booking survey</a>
                             </div>
                         </div>
                     </article>
@@ -296,7 +304,7 @@
                     <select name="room_interest">
                         <option value="">Pilih kamar/tipe</option>
                         <?php foreach ($featured_rooms as $room): ?>
-                            <option value="<?= html_escape($room['code'] . ' - ' . $room['name']); ?>"><?= html_escape($room['code'] . ' - ' . $room['name']); ?></option>
+                            <option value="<?= html_escape($room['name']); ?>"><?= html_escape($room['name']); ?> - mulai Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </label>

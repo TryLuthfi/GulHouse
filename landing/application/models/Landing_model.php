@@ -52,12 +52,16 @@ class Landing_model extends CI_Model
     {
         if ($this->table_exists('gh_room_database')) {
             $rows = $this->db
-                ->select('room_type AS name, COUNT(id) AS total_rooms', FALSE)
+                ->select('CONCAT(property_code, " - ", room_type) AS name', FALSE)
+                ->select('property_code', FALSE)
+                ->select('room_type', FALSE)
+                ->select('COUNT(id) AS total_rooms', FALSE)
                 ->select('MIN(CASE WHEN monthly_price IS NOT NULL AND is_mess = 0 THEN monthly_price END) AS price_from', FALSE)
                 ->select('SUM(CASE WHEN monthly_price IS NOT NULL AND is_mess = 0 THEN 1 ELSE 0 END) AS available_count', FALSE)
                 ->from('gh_room_database')
-                ->group_by('room_type')
-                ->order_by('price_from', 'ASC')
+                ->group_by('property_code, room_type')
+                ->order_by('property_code', 'ASC')
+                ->order_by('FIELD(room_type, "Standart", "Deluxe", "VIP")', '', FALSE)
                 ->order_by('room_type', 'ASC')
                 ->get()
                 ->result_array();
@@ -82,90 +86,57 @@ class Landing_model extends CI_Model
     public function get_featured_rooms()
     {
         if ($this->table_exists('gh_room_database')) {
-            $rows = $this->db
-                ->select('id, property_code, room_code, room_type, room_label, monthly_price, is_mess')
-                ->from('gh_room_database')
-                ->where('monthly_price IS NOT NULL', NULL, FALSE)
-                ->where('is_mess', 0)
-                ->order_by('property_code', 'ASC')
-                ->order_by('FIELD(room_type, "VIP", "Deluxe", "Standart")', '', FALSE)
-                ->order_by('room_name', 'ASC')
-                ->order_by('room_code', 'ASC')
-                ->get()
-                ->result_array();
-
-            if ($rows) {
-                return $this->pick_featured_gh_rooms($rows, 8);
-            }
+            return $this->get_public_room_type_cards();
         }
 
         if ($this->table_exists('rooms')) {
             $rows = $this->db
-                ->select('r.id, r.code, r.name, r.price, r.status, rt.name AS type_name')
+                ->select('COALESCE(rt.name, "Room") AS type_name', FALSE)
+                ->select('COUNT(r.id) AS total_rooms', FALSE)
+                ->select('SUM(CASE WHEN r.status = "available" THEN 1 ELSE 0 END) AS available_count', FALSE)
+                ->select('MIN(CASE WHEN r.price > 0 THEN r.price END) AS price', FALSE)
+                ->select('MAX(CASE WHEN r.price > 0 THEN r.price END) AS max_price', FALSE)
                 ->from('rooms r')
                 ->join('room_types rt', 'rt.id = r.room_type_id', 'left')
-                ->where('r.status', 'available')
-                ->order_by('r.code', 'ASC')
-                ->order_by('r.name', 'ASC')
-                ->limit(6)
+                ->group_by('r.room_type_id, rt.name')
+                ->order_by('price', 'ASC')
                 ->get()
                 ->result_array();
 
             if ($rows) {
-                return $rows;
+                return $this->map_public_type_rows($rows);
             }
         }
 
-        return array(
-            array('code' => 'GH 1', 'name' => 'Ephesus 217', 'type_name' => 'Standart', 'price' => 1500000, 'status' => 'available'),
-            array('code' => 'GH 2', 'name' => 'Cappadocia 408', 'type_name' => 'Standart', 'price' => 2000000, 'status' => 'available'),
-            array('code' => 'GH 2', 'name' => 'Canakkale 202', 'type_name' => 'VIP', 'price' => 3000000, 'status' => 'available'),
-        );
+        return $this->fallback_public_room_type_cards();
     }
 
     public function get_all_public_rooms()
     {
         if ($this->table_exists('gh_room_database')) {
-            $rows = $this->db
-                ->select('id, property_code, room_code, room_type, room_label, monthly_price, is_mess')
-                ->from('gh_room_database')
-                ->order_by('CASE WHEN monthly_price IS NOT NULL AND is_mess = 0 THEN 0 ELSE 1 END', 'ASC', FALSE)
-                ->order_by('monthly_price', 'ASC')
-                ->order_by('property_code', 'ASC')
-                ->order_by('room_code', 'ASC')
-                ->get()
-                ->result_array();
-
-            if ($rows) {
-                return $this->map_gh_rooms($rows);
-            }
+            return $this->get_public_room_type_cards();
         }
 
         if ($this->table_exists('rooms')) {
             $rows = $this->db
-                ->select('r.id, r.code, r.name, r.price, r.status, rt.name AS type_name')
+                ->select('COALESCE(rt.name, "Room") AS type_name', FALSE)
+                ->select('COUNT(r.id) AS total_rooms', FALSE)
+                ->select('SUM(CASE WHEN r.status = "available" THEN 1 ELSE 0 END) AS available_count', FALSE)
+                ->select('MIN(CASE WHEN r.price > 0 THEN r.price END) AS price', FALSE)
+                ->select('MAX(CASE WHEN r.price > 0 THEN r.price END) AS max_price', FALSE)
                 ->from('rooms r')
                 ->join('room_types rt', 'rt.id = r.room_type_id', 'left')
-                ->order_by('FIELD(r.status, "available", "reserved", "maintenance", "occupied")', '', FALSE)
-                ->order_by('r.price', 'ASC')
-                ->order_by('r.code', 'ASC')
-                ->limit(12)
+                ->group_by('r.room_type_id, rt.name')
+                ->order_by('price', 'ASC')
                 ->get()
                 ->result_array();
 
             if ($rows) {
-                return $rows;
+                return $this->map_public_type_rows($rows);
             }
         }
 
-        return array(
-            array('id' => 7, 'code' => 'GH 1', 'name' => 'Ephesus 203', 'type_name' => 'Standart', 'price' => 1500000, 'status' => 'available'),
-            array('id' => 19, 'code' => 'GH 1', 'name' => 'Ephesus 217', 'type_name' => 'Standart', 'price' => 1500000, 'status' => 'available'),
-            array('id' => 54, 'code' => 'GH 2', 'name' => 'Cappadocia 408', 'type_name' => 'Standart', 'price' => 2000000, 'status' => 'available'),
-            array('id' => 58, 'code' => 'GH 2', 'name' => 'Cappadocia 412', 'type_name' => 'Standart', 'price' => 2000000, 'status' => 'available'),
-            array('id' => 31, 'code' => 'GH 2', 'name' => 'Canakkale 202', 'type_name' => 'VIP', 'price' => 3000000, 'status' => 'available'),
-            array('id' => 3, 'code' => 'GH 1', 'name' => 'Alanya 102', 'type_name' => 'VIP', 'price' => 2000000, 'status' => 'occupied'),
-        );
+        return $this->fallback_public_room_type_cards();
     }
 
     public function get_amenities()
@@ -249,6 +220,22 @@ class Landing_model extends CI_Model
             ->result_array();
     }
 
+    public function get_room_type_detail($slug)
+    {
+        $slug = $this->normalize_slug($slug);
+        if ($slug === '') {
+            return FALSE;
+        }
+
+        foreach ($this->get_public_room_type_cards() as $card) {
+            if ($card['slug'] === $slug) {
+                return $this->normalize_public_room_type_detail($card);
+            }
+        }
+
+        return FALSE;
+    }
+
     public function get_room_detail($id)
     {
         if ($id <= 0) {
@@ -324,10 +311,54 @@ class Landing_model extends CI_Model
         }
 
         return array(
-            array('id' => 2, 'code' => 'GH 1', 'name' => 'Alanya 101', 'type_name' => 'VIP', 'price' => 2000000, 'status' => 'available'),
-            array('id' => 54, 'code' => 'GH 2', 'name' => 'Cappadocia 408', 'type_name' => 'Standart', 'price' => 2000000, 'status' => 'available'),
-            array('id' => 61, 'code' => 'GH 2', 'name' => 'Cappadocia 416', 'type_name' => 'VIP', 'price' => 3000000, 'status' => 'available'),
+            array('id' => 1, 'code' => 'GH 1', 'name' => 'GH 1 - VIP', 'type_name' => 'VIP', 'price' => 2000000, 'status' => 'available'),
+            array('id' => 2, 'code' => 'GH 2', 'name' => 'GH 2 - Standart', 'type_name' => 'Standart', 'price' => 2000000, 'status' => 'available'),
+            array('id' => 3, 'code' => 'GH 2', 'name' => 'GH 2 - VIP', 'type_name' => 'VIP', 'price' => 3000000, 'status' => 'available'),
         );
+    }
+
+    public function get_similar_room_types(array $room)
+    {
+        $similar = array();
+        foreach ($this->get_public_room_type_cards() as $card) {
+            if (isset($room['slug']) && $card['slug'] === $room['slug']) {
+                continue;
+            }
+
+            if ($card['code'] === $room['code'] || $card['type_name'] === $room['type_name']) {
+                $similar[] = $this->normalize_public_room_type_detail($card);
+            }
+
+            if (count($similar) >= 3) {
+                break;
+            }
+        }
+
+        if (count($similar) < 3) {
+            foreach ($this->get_public_room_type_cards() as $card) {
+                if (isset($room['slug']) && $card['slug'] === $room['slug']) {
+                    continue;
+                }
+
+                $exists = FALSE;
+                foreach ($similar as $item) {
+                    if ($item['slug'] === $card['slug']) {
+                        $exists = TRUE;
+                        break;
+                    }
+                }
+
+                if ( ! $exists) {
+                    $similar[] = $this->normalize_public_room_type_detail($card);
+                }
+
+                if (count($similar) >= 3) {
+                    break;
+                }
+            }
+        }
+
+        return $similar;
     }
 
     public function get_room_gallery(array $room)
@@ -476,6 +507,119 @@ class Landing_model extends CI_Model
         return $rooms;
     }
 
+    private function get_public_room_type_cards()
+    {
+        $rows = $this->db
+            ->select('property_code', FALSE)
+            ->select('room_type AS type_name', FALSE)
+            ->select('COUNT(id) AS total_rooms', FALSE)
+            ->select('SUM(CASE WHEN monthly_price IS NOT NULL AND is_mess = 0 THEN 1 ELSE 0 END) AS available_count', FALSE)
+            ->select('MIN(CASE WHEN monthly_price IS NOT NULL AND is_mess = 0 THEN monthly_price END) AS price', FALSE)
+            ->select('MAX(CASE WHEN monthly_price IS NOT NULL AND is_mess = 0 THEN monthly_price END) AS max_price', FALSE)
+            ->select('MIN(CASE WHEN deposit IS NOT NULL AND is_mess = 0 THEN deposit END) AS deposit_estimate', FALSE)
+            ->from('gh_room_database')
+            ->group_by('property_code, room_type')
+            ->order_by('property_code', 'ASC')
+            ->order_by('FIELD(room_type, "Standart", "Deluxe", "VIP")', '', FALSE)
+            ->order_by('room_type', 'ASC')
+            ->get()
+            ->result_array();
+
+        $cards = array();
+        foreach ($rows as $index => $row) {
+            $cards[] = array(
+                'id' => $index + 1,
+                'code' => $row['property_code'],
+                'name' => $row['property_code'] . ' - ' . $row['type_name'],
+                'slug' => $this->create_public_room_slug($row['property_code'], $row['type_name']),
+                'price' => (int) $row['price'],
+                'max_price' => (int) $row['max_price'],
+                'status' => ((int) $row['available_count'] > 0) ? 'available' : 'maintenance',
+                'type_name' => $row['type_name'],
+                'total_rooms' => (int) $row['total_rooms'],
+                'available_count' => (int) $row['available_count'],
+                'deposit_estimate' => (int) $row['deposit_estimate'],
+            );
+        }
+
+        return $cards ? $cards : $this->fallback_public_room_type_cards();
+    }
+
+    private function fallback_public_room_type_cards()
+    {
+        $cards = array();
+        $fallback = array(
+            array('code' => 'GH 1', 'type_name' => 'Standart', 'total_rooms' => 19, 'available_count' => 19, 'price' => 1500000, 'max_price' => 1500000),
+            array('code' => 'GH 1', 'type_name' => 'Deluxe', 'total_rooms' => 3, 'available_count' => 3, 'price' => 1750000, 'max_price' => 1750000),
+            array('code' => 'GH 1', 'type_name' => 'VIP', 'total_rooms' => 4, 'available_count' => 4, 'price' => 2000000, 'max_price' => 2000000),
+            array('code' => 'GH 2', 'type_name' => 'Standart', 'total_rooms' => 17, 'available_count' => 17, 'price' => 2000000, 'max_price' => 2000000),
+            array('code' => 'GH 2', 'type_name' => 'Deluxe', 'total_rooms' => 9, 'available_count' => 9, 'price' => 2500000, 'max_price' => 2500000),
+            array('code' => 'GH 2', 'type_name' => 'VIP', 'total_rooms' => 8, 'available_count' => 8, 'price' => 3000000, 'max_price' => 3000000),
+        );
+
+        foreach ($fallback as $index => $row) {
+            $row['id'] = $index + 1;
+            $row['name'] = $row['code'] . ' - ' . $row['type_name'];
+            $row['slug'] = $this->create_public_room_slug($row['code'], $row['type_name']);
+            $row['status'] = ((int) $row['available_count'] > 0) ? 'available' : 'maintenance';
+            $row['deposit_estimate'] = 0;
+            $cards[] = $row;
+        }
+
+        return $cards;
+    }
+
+    private function map_public_type_rows(array $rows)
+    {
+        $cards = array();
+        foreach ($rows as $index => $row) {
+            $available = isset($row['available_count']) ? (int) $row['available_count'] : 0;
+            $cards[] = array(
+                'id' => $index + 1,
+                'code' => isset($row['code']) ? $row['code'] : 'GUL HOUSE',
+                'name' => (isset($row['code']) ? $row['code'] . ' - ' : 'Kamar ') . $row['type_name'],
+                'slug' => $this->create_public_room_slug(isset($row['code']) ? $row['code'] : 'GUL HOUSE', $row['type_name']),
+                'price' => (int) $row['price'],
+                'max_price' => (int) $row['max_price'],
+                'status' => $available > 0 ? 'available' : 'maintenance',
+                'type_name' => $row['type_name'],
+                'total_rooms' => (int) $row['total_rooms'],
+                'available_count' => $available,
+                'deposit_estimate' => 0,
+            );
+        }
+
+        return $cards;
+    }
+
+    private function normalize_public_room_type_detail(array $card)
+    {
+        $priceLabel = 'Rp ' . number_format((int) $card['price'], 0, ',', '.');
+        if ((int) $card['max_price'] > (int) $card['price']) {
+            $priceLabel .= ' - Rp ' . number_format((int) $card['max_price'], 0, ',', '.');
+        }
+
+        $card['notes'] = 'Ringkasan publik per gedung dan tipe kamar.';
+        $card['price_label'] = $priceLabel;
+        $card['type_description'] = $card['name'] . ' memiliki ' . (int) $card['available_count'] . ' kamar tersedia dari ' . (int) $card['total_rooms'] . ' kamar. Harga dapat berbeda sesuai fasilitas dan kondisi kamar.';
+        $card['public_description'] = 'Pilihan ' . $card['type_name'] . ' di ' . $card['code'] . ' untuk calon penghuni yang ingin survey kamar tanpa memilih nomor kamar terlebih dahulu.';
+        $card['facilities'] = array('Kasur', 'Lemari', 'Meja kerja', 'Kursi', 'Akses 24 jam');
+
+        return $card;
+    }
+
+    private function create_public_room_slug($property, $type)
+    {
+        return $this->normalize_slug($property . '-' . $type);
+    }
+
+    private function normalize_slug($value)
+    {
+        $value = strtolower(trim((string) $value));
+        $value = preg_replace('/[^a-z0-9]+/', '-', $value);
+        return trim($value, '-');
+    }
+
     private function pick_featured_gh_rooms(array $rows, $limit)
     {
         $selected = array();
@@ -541,7 +685,7 @@ class Landing_model extends CI_Model
         $fallback = array(
             'id' => $id,
             'code' => 'GH 2',
-            'name' => 'Cappadocia 408',
+            'name' => 'GH 2 - Standart',
             'price' => 2000000,
             'status' => 'available',
             'notes' => '',

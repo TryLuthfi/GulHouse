@@ -1091,6 +1091,79 @@ a {
     background: #f7faf6;
 }
 
+.detail-sticky-bar {
+    position: fixed;
+    top: 70px;
+    left: clamp(16px, 5vw, 72px);
+    right: clamp(16px, 5vw, 72px);
+    z-index: 9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 12px 14px 12px 18px;
+    color: var(--ink);
+    background: rgba(251, 252, 248, .92);
+    border: 1px solid rgba(223, 230, 225, .88);
+    border-radius: 8px;
+    box-shadow: 0 18px 46px rgba(21, 32, 28, .14), 0 0 36px rgba(201, 151, 76, .12);
+    backdrop-filter: blur(18px);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-14px);
+    transition: opacity .24s ease, transform .24s ease;
+}
+
+.detail-sticky-bar.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.detail-sticky-bar div {
+    min-width: 0;
+}
+
+.detail-sticky-bar div:last-child {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    flex-shrink: 0;
+}
+
+.detail-sticky-bar span {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.detail-sticky-bar strong {
+    display: block;
+    overflow: hidden;
+    max-width: 48vw;
+    font-size: 16px;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail-sticky-bar a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 0 16px;
+    color: var(--white);
+    background: var(--forest);
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 800;
+    box-shadow: 0 10px 24px rgba(23, 63, 53, .2);
+}
+
 .detail-hero {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 360px;
@@ -1614,6 +1687,38 @@ a {
 
     .header-action {
         width: 100%;
+    }
+
+    .detail-sticky-bar {
+        top: 12px;
+        left: 12px;
+        right: 12px;
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .detail-sticky-bar div:last-child {
+        width: 100%;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .detail-sticky-bar strong {
+        max-width: 100%;
+        white-space: normal;
+    }
+
+    .detail-sticky-bar div:last-child strong {
+        font-size: 14px;
+        white-space: nowrap;
+    }
+
+    .detail-sticky-bar a {
+        min-height: 34px;
+        padding: 0 12px;
+        white-space: nowrap;
     }
 
     .hero {
