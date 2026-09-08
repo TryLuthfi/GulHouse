@@ -1,0 +1,12 @@
+RewriteEngine On
+
+# Izinkan akses langsung ke folder uploads
+RewriteCond %{REQUEST_URI} ^/uploads/.*$ [NC]
+RewriteRule .* - [L]
+
+# Redirect semua request ke index.php jika bukan file atau folder yang ada
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php/$1 [L]
+
+

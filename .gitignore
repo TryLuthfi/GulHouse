@@ -1,0 +1,16 @@
+*.log
+*.tmp
+.env
+!/landing/.env
+/vendor/
+/node_modules/
+/.idea/
+/.vscode/
+/uploads/
+/storage/cache/
+/landing/application/cache/*
+!/landing/application/cache/index.html
+!/landing/application/cache/.gitkeep
+/landing/application/logs/*
+!/landing/application/logs/index.html
+!/landing/application/logs/.gitkeep

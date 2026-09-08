@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS `gh_room_database` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `property_code` VARCHAR(20) NOT NULL,
+  `room_code` VARCHAR(30) NOT NULL,
+  `room_class_code` VARCHAR(10) DEFAULT NULL,
+  `room_type` VARCHAR(50) NOT NULL,
+  `room_name` VARCHAR(100) NOT NULL,
+  `room_label` VARCHAR(150) NOT NULL,
+  `deposit` BIGINT UNSIGNED DEFAULT NULL,
+  `monthly_price` BIGINT UNSIGNED DEFAULT NULL,
+  `is_mess` TINYINT(1) NOT NULL DEFAULT 0,
+  `floor_no` TINYINT UNSIGNED DEFAULT NULL,
+  `source_sheet` VARCHAR(100) NOT NULL,
+  `source_row` INT UNSIGNED NOT NULL,
+  `source_file` VARCHAR(255) NOT NULL,
+  `imported_at` DATETIME NOT NULL,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_property_room` (`property_code`, `room_code`, `room_name`),
+  KEY `idx_property_type` (`property_code`, `room_type`),
+  KEY `idx_monthly_price` (`monthly_price`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
