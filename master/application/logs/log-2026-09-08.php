@@ -2111,3 +2111,247 @@ INFO - 2026-09-08 14:28:01 --> Model "Auth_model" initialized
 INFO - 2026-09-08 14:28:01 --> File loaded: D:\XAMPP\htdocs\GulHouse\master\application\views\auth/login.php
 INFO - 2026-09-08 14:28:01 --> Final output sent to browser
 DEBUG - 2026-09-08 14:28:01 --> Total execution time: 0.0625
+ERROR - 2026-09-08 17:47:34 --> Could not find the specified $config['composer_autoload'] path: D:\XAMPP\htdocs\GulHouse\master\application\../vendor/autoload.php
+INFO - 2026-09-08 17:47:34 --> Config Class Initialized
+INFO - 2026-09-08 17:47:34 --> Hooks Class Initialized
+DEBUG - 2026-09-08 17:47:34 --> UTF-8 Support Enabled
+INFO - 2026-09-08 17:47:34 --> Utf8 Class Initialized
+INFO - 2026-09-08 17:47:34 --> URI Class Initialized
+INFO - 2026-09-08 17:47:34 --> Router Class Initialized
+INFO - 2026-09-08 17:47:34 --> Output Class Initialized
+INFO - 2026-09-08 17:47:34 --> Security Class Initialized
+DEBUG - 2026-09-08 17:47:34 --> Global POST, GET and COOKIE data sanitized
+INFO - 2026-09-08 17:47:34 --> Input Class Initialized
+INFO - 2026-09-08 17:47:34 --> Language Class Initialized
+INFO - 2026-09-08 17:47:34 --> Loader Class Initialized
+INFO - 2026-09-08 17:47:34 --> Helper loaded: url_helper
+INFO - 2026-09-08 17:47:34 --> Helper loaded: html_helper
+INFO - 2026-09-08 17:47:34 --> Helper loaded: form_helper
+INFO - 2026-09-08 17:47:34 --> Helper loaded: security_helper
+INFO - 2026-09-08 17:47:34 --> Database Driver Class Initialized
+INFO - 2026-09-08 17:47:34 --> Session: Class initialized using 'files' driver.
+INFO - 2026-09-08 17:47:34 --> Form Validation Class Initialized
+INFO - 2026-09-08 17:47:34 --> Controller Class Initialized
+ERROR - 2026-09-08 17:47:34 --> Could not find the specified $config['composer_autoload'] path: D:\XAMPP\htdocs\GulHouse\master\application\../vendor/autoload.php
+INFO - 2026-09-08 17:47:34 --> Config Class Initialized
+INFO - 2026-09-08 17:47:34 --> Hooks Class Initialized
+DEBUG - 2026-09-08 17:47:34 --> UTF-8 Support Enabled
+INFO - 2026-09-08 17:47:34 --> Utf8 Class Initialized
+INFO - 2026-09-08 17:47:34 --> URI Class Initialized
+INFO - 2026-09-08 17:47:34 --> Router Class Initialized
+INFO - 2026-09-08 17:47:34 --> Output Class Initialized
+INFO - 2026-09-08 17:47:34 --> Security Class Initialized
+DEBUG - 2026-09-08 17:47:34 --> Global POST, GET and COOKIE data sanitized
+INFO - 2026-09-08 17:47:34 --> Input Class Initialized
+INFO - 2026-09-08 17:47:34 --> Language Class Initialized
+INFO - 2026-09-08 17:47:34 --> Loader Class Initialized
+INFO - 2026-09-08 17:47:34 --> Helper loaded: url_helper
+INFO - 2026-09-08 17:47:34 --> Helper loaded: html_helper
+INFO - 2026-09-08 17:47:34 --> Helper loaded: form_helper
+INFO - 2026-09-08 17:47:34 --> Helper loaded: security_helper
+INFO - 2026-09-08 17:47:34 --> Database Driver Class Initialized
+INFO - 2026-09-08 17:47:34 --> Session: Class initialized using 'files' driver.
+INFO - 2026-09-08 17:47:34 --> Form Validation Class Initialized
+INFO - 2026-09-08 17:47:34 --> Controller Class Initialized
+INFO - 2026-09-08 17:47:34 --> Model "Auth_model" initialized
+INFO - 2026-09-08 17:47:34 --> File loaded: D:\XAMPP\htdocs\GulHouse\master\application\views\auth/login.php
+INFO - 2026-09-08 17:47:34 --> Final output sent to browser
+DEBUG - 2026-09-08 17:47:34 --> Total execution time: 0.0661
+ERROR - 2026-09-08 17:47:36 --> Could not find the specified $config['composer_autoload'] path: D:\XAMPP\htdocs\GulHouse\master\application\../vendor/autoload.php
+INFO - 2026-09-08 17:47:36 --> Config Class Initialized
+INFO - 2026-09-08 17:47:36 --> Hooks Class Initialized
+DEBUG - 2026-09-08 17:47:36 --> UTF-8 Support Enabled
+INFO - 2026-09-08 17:47:36 --> Utf8 Class Initialized
+INFO - 2026-09-08 17:47:36 --> URI Class Initialized
+INFO - 2026-09-08 17:47:36 --> Router Class Initialized
+INFO - 2026-09-08 17:47:36 --> Output Class Initialized
+INFO - 2026-09-08 17:47:36 --> Security Class Initialized
+DEBUG - 2026-09-08 17:47:36 --> Global POST, GET and COOKIE data sanitized
+INFO - 2026-09-08 17:47:36 --> Input Class Initialized
+INFO - 2026-09-08 17:47:36 --> Language Class Initialized
+INFO - 2026-09-08 17:47:36 --> Loader Class Initialized
+INFO - 2026-09-08 17:47:36 --> Helper loaded: url_helper
+INFO - 2026-09-08 17:47:36 --> Helper loaded: html_helper
+INFO - 2026-09-08 17:47:36 --> Helper loaded: form_helper
+INFO - 2026-09-08 17:47:36 --> Helper loaded: security_helper
+INFO - 2026-09-08 17:47:36 --> Database Driver Class Initialized
+INFO - 2026-09-08 17:47:36 --> Session: Class initialized using 'files' driver.
+INFO - 2026-09-08 17:47:36 --> Form Validation Class Initialized
+INFO - 2026-09-08 17:47:36 --> Controller Class Initialized
+INFO - 2026-09-08 17:47:36 --> Model "Auth_model" initialized
+ERROR - 2026-09-08 17:47:36 --> Severity: 8192 --> setcookie(): Passing null to parameter #2 ($value) of type string is deprecated D:\XAMPP\htdocs\GulHouse\master\system\libraries\Session\Session_driver.php 142
+ERROR - 2026-09-08 17:47:36 --> Could not find the specified $config['composer_autoload'] path: D:\XAMPP\htdocs\GulHouse\master\application\../vendor/autoload.php
+INFO - 2026-09-08 17:47:36 --> Config Class Initialized
+INFO - 2026-09-08 17:47:36 --> Hooks Class Initialized
+DEBUG - 2026-09-08 17:47:36 --> UTF-8 Support Enabled
+INFO - 2026-09-08 17:47:36 --> Utf8 Class Initialized
+INFO - 2026-09-08 17:47:36 --> URI Class Initialized
+INFO - 2026-09-08 17:47:36 --> Router Class Initialized
+INFO - 2026-09-08 17:47:36 --> Output Class Initialized
+INFO - 2026-09-08 17:47:36 --> Security Class Initialized
+DEBUG - 2026-09-08 17:47:36 --> Global POST, GET and COOKIE data sanitized
+INFO - 2026-09-08 17:47:36 --> Input Class Initialized
+INFO - 2026-09-08 17:47:36 --> Language Class Initialized
+INFO - 2026-09-08 17:47:36 --> Loader Class Initialized
+INFO - 2026-09-08 17:47:36 --> Helper loaded: url_helper
+INFO - 2026-09-08 17:47:36 --> Helper loaded: html_helper
+INFO - 2026-09-08 17:47:36 --> Helper loaded: form_helper
+INFO - 2026-09-08 17:47:36 --> Helper loaded: security_helper
+INFO - 2026-09-08 17:47:36 --> Database Driver Class Initialized
+INFO - 2026-09-08 17:47:36 --> Session: Class initialized using 'files' driver.
+INFO - 2026-09-08 17:47:36 --> Form Validation Class Initialized
+INFO - 2026-09-08 17:47:36 --> Controller Class Initialized
+INFO - 2026-09-08 17:47:36 --> Model "Dashboard_model" initialized
+INFO - 2026-09-08 17:47:36 --> File loaded: D:\XAMPP\htdocs\GulHouse\master\application\views\dashboard/index.php
+INFO - 2026-09-08 17:47:36 --> Final output sent to browser
+DEBUG - 2026-09-08 17:47:36 --> Total execution time: 0.1344
+ERROR - 2026-09-08 17:47:38 --> Could not find the specified $config['composer_autoload'] path: D:\XAMPP\htdocs\GulHouse\master\application\../vendor/autoload.php
+INFO - 2026-09-08 17:47:38 --> Config Class Initialized
+INFO - 2026-09-08 17:47:38 --> Hooks Class Initialized
+DEBUG - 2026-09-08 17:47:38 --> UTF-8 Support Enabled
+INFO - 2026-09-08 17:47:38 --> Utf8 Class Initialized
+INFO - 2026-09-08 17:47:38 --> URI Class Initialized
+INFO - 2026-09-08 17:47:38 --> Router Class Initialized
+INFO - 2026-09-08 17:47:38 --> Output Class Initialized
+INFO - 2026-09-08 17:47:38 --> Security Class Initialized
+DEBUG - 2026-09-08 17:47:38 --> Global POST, GET and COOKIE data sanitized
+INFO - 2026-09-08 17:47:38 --> Input Class Initialized
+INFO - 2026-09-08 17:47:38 --> Language Class Initialized
+INFO - 2026-09-08 17:47:38 --> Loader Class Initialized
+INFO - 2026-09-08 17:47:38 --> Helper loaded: url_helper
+INFO - 2026-09-08 17:47:38 --> Helper loaded: html_helper
+INFO - 2026-09-08 17:47:38 --> Helper loaded: form_helper
+INFO - 2026-09-08 17:47:38 --> Helper loaded: security_helper
+INFO - 2026-09-08 17:47:38 --> Database Driver Class Initialized
+INFO - 2026-09-08 17:47:38 --> Session: Class initialized using 'files' driver.
+INFO - 2026-09-08 17:47:38 --> Form Validation Class Initialized
+INFO - 2026-09-08 17:47:38 --> Controller Class Initialized
+INFO - 2026-09-08 17:47:38 --> Model "Master_model" initialized
+INFO - 2026-09-08 17:47:38 --> File loaded: D:\XAMPP\htdocs\GulHouse\master\application\views\manage/tenants.php
+INFO - 2026-09-08 17:47:38 --> Final output sent to browser
+DEBUG - 2026-09-08 17:47:38 --> Total execution time: 0.1347
+ERROR - 2026-09-08 17:49:40 --> Could not find the specified $config['composer_autoload'] path: D:\XAMPP\htdocs\GulHouse\master\application\../vendor/autoload.php
+INFO - 2026-09-08 17:49:40 --> Config Class Initialized
+INFO - 2026-09-08 17:49:40 --> Hooks Class Initialized
+DEBUG - 2026-09-08 17:49:40 --> UTF-8 Support Enabled
+INFO - 2026-09-08 17:49:40 --> Utf8 Class Initialized
+INFO - 2026-09-08 17:49:40 --> URI Class Initialized
+INFO - 2026-09-08 17:49:40 --> Router Class Initialized
+INFO - 2026-09-08 17:49:40 --> Output Class Initialized
+INFO - 2026-09-08 17:49:40 --> Security Class Initialized
+DEBUG - 2026-09-08 17:49:40 --> Global POST, GET and COOKIE data sanitized
+INFO - 2026-09-08 17:49:40 --> Input Class Initialized
+INFO - 2026-09-08 17:49:40 --> Language Class Initialized
+INFO - 2026-09-08 17:49:40 --> Loader Class Initialized
+INFO - 2026-09-08 17:49:40 --> Helper loaded: url_helper
+INFO - 2026-09-08 17:49:40 --> Helper loaded: html_helper
+INFO - 2026-09-08 17:49:40 --> Helper loaded: form_helper
+INFO - 2026-09-08 17:49:40 --> Helper loaded: security_helper
+INFO - 2026-09-08 17:49:40 --> Database Driver Class Initialized
+INFO - 2026-09-08 17:49:40 --> Session: Class initialized using 'files' driver.
+INFO - 2026-09-08 17:49:40 --> Form Validation Class Initialized
+INFO - 2026-09-08 17:49:40 --> Controller Class Initialized
+INFO - 2026-09-08 17:49:40 --> Model "Master_model" initialized
+INFO - 2026-09-08 17:49:40 --> File loaded: D:\XAMPP\htdocs\GulHouse\master\application\views\manage/rooms.php
+INFO - 2026-09-08 17:49:40 --> Final output sent to browser
+DEBUG - 2026-09-08 17:49:40 --> Total execution time: 0.0386
+ERROR - 2026-09-08 17:50:13 --> Could not find the specified $config['composer_autoload'] path: D:\XAMPP\htdocs\GulHouse\master\application\../vendor/autoload.php
+INFO - 2026-09-08 17:50:13 --> Config Class Initialized
+INFO - 2026-09-08 17:50:13 --> Hooks Class Initialized
+DEBUG - 2026-09-08 17:50:13 --> UTF-8 Support Enabled
+INFO - 2026-09-08 17:50:13 --> Utf8 Class Initialized
+INFO - 2026-09-08 17:50:13 --> URI Class Initialized
+INFO - 2026-09-08 17:50:13 --> Router Class Initialized
+INFO - 2026-09-08 17:50:13 --> Output Class Initialized
+INFO - 2026-09-08 17:50:13 --> Security Class Initialized
+DEBUG - 2026-09-08 17:50:13 --> Global POST, GET and COOKIE data sanitized
+INFO - 2026-09-08 17:50:13 --> Input Class Initialized
+INFO - 2026-09-08 17:50:13 --> Language Class Initialized
+INFO - 2026-09-08 17:50:13 --> Loader Class Initialized
+INFO - 2026-09-08 17:50:13 --> Helper loaded: url_helper
+INFO - 2026-09-08 17:50:13 --> Helper loaded: html_helper
+INFO - 2026-09-08 17:50:13 --> Helper loaded: form_helper
+INFO - 2026-09-08 17:50:13 --> Helper loaded: security_helper
+INFO - 2026-09-08 17:50:13 --> Database Driver Class Initialized
+INFO - 2026-09-08 17:50:13 --> Session: Class initialized using 'files' driver.
+INFO - 2026-09-08 17:50:13 --> Form Validation Class Initialized
+INFO - 2026-09-08 17:50:13 --> Controller Class Initialized
+INFO - 2026-09-08 17:50:13 --> Model "Master_model" initialized
+INFO - 2026-09-08 17:50:13 --> File loaded: D:\XAMPP\htdocs\GulHouse\master\application\views\manage/rooms.php
+INFO - 2026-09-08 17:50:13 --> Final output sent to browser
+DEBUG - 2026-09-08 17:50:13 --> Total execution time: 0.0448
+ERROR - 2026-09-08 17:50:18 --> Could not find the specified $config['composer_autoload'] path: D:\XAMPP\htdocs\GulHouse\master\application\../vendor/autoload.php
+INFO - 2026-09-08 17:50:18 --> Config Class Initialized
+INFO - 2026-09-08 17:50:18 --> Hooks Class Initialized
+DEBUG - 2026-09-08 17:50:18 --> UTF-8 Support Enabled
+INFO - 2026-09-08 17:50:18 --> Utf8 Class Initialized
+INFO - 2026-09-08 17:50:18 --> URI Class Initialized
+INFO - 2026-09-08 17:50:18 --> Router Class Initialized
+INFO - 2026-09-08 17:50:18 --> Output Class Initialized
+INFO - 2026-09-08 17:50:18 --> Security Class Initialized
+DEBUG - 2026-09-08 17:50:18 --> Global POST, GET and COOKIE data sanitized
+INFO - 2026-09-08 17:50:18 --> Input Class Initialized
+INFO - 2026-09-08 17:50:18 --> Language Class Initialized
+INFO - 2026-09-08 17:50:18 --> Loader Class Initialized
+INFO - 2026-09-08 17:50:18 --> Helper loaded: url_helper
+INFO - 2026-09-08 17:50:18 --> Helper loaded: html_helper
+INFO - 2026-09-08 17:50:18 --> Helper loaded: form_helper
+INFO - 2026-09-08 17:50:18 --> Helper loaded: security_helper
+INFO - 2026-09-08 17:50:18 --> Database Driver Class Initialized
+INFO - 2026-09-08 17:50:18 --> Session: Class initialized using 'files' driver.
+INFO - 2026-09-08 17:50:18 --> Form Validation Class Initialized
+INFO - 2026-09-08 17:50:18 --> Controller Class Initialized
+INFO - 2026-09-08 17:50:18 --> Model "Master_model" initialized
+INFO - 2026-09-08 17:50:18 --> File loaded: D:\XAMPP\htdocs\GulHouse\master\application\views\manage/rooms.php
+INFO - 2026-09-08 17:50:18 --> Final output sent to browser
+DEBUG - 2026-09-08 17:50:18 --> Total execution time: 0.0375
+ERROR - 2026-09-08 17:50:49 --> Could not find the specified $config['composer_autoload'] path: D:\XAMPP\htdocs\GulHouse\master\application\../vendor/autoload.php
+INFO - 2026-09-08 17:50:49 --> Config Class Initialized
+INFO - 2026-09-08 17:50:49 --> Hooks Class Initialized
+DEBUG - 2026-09-08 17:50:49 --> UTF-8 Support Enabled
+INFO - 2026-09-08 17:50:49 --> Utf8 Class Initialized
+INFO - 2026-09-08 17:50:49 --> URI Class Initialized
+INFO - 2026-09-08 17:50:49 --> Router Class Initialized
+INFO - 2026-09-08 17:50:49 --> Output Class Initialized
+INFO - 2026-09-08 17:50:49 --> Security Class Initialized
+DEBUG - 2026-09-08 17:50:49 --> Global POST, GET and COOKIE data sanitized
+INFO - 2026-09-08 17:50:49 --> Input Class Initialized
+INFO - 2026-09-08 17:50:49 --> Language Class Initialized
+INFO - 2026-09-08 17:50:49 --> Loader Class Initialized
+INFO - 2026-09-08 17:50:49 --> Helper loaded: url_helper
+INFO - 2026-09-08 17:50:49 --> Helper loaded: html_helper
+INFO - 2026-09-08 17:50:49 --> Helper loaded: form_helper
+INFO - 2026-09-08 17:50:49 --> Helper loaded: security_helper
+INFO - 2026-09-08 17:50:49 --> Database Driver Class Initialized
+INFO - 2026-09-08 17:50:49 --> Session: Class initialized using 'files' driver.
+INFO - 2026-09-08 17:50:49 --> Form Validation Class Initialized
+INFO - 2026-09-08 17:50:49 --> Controller Class Initialized
+INFO - 2026-09-08 17:50:49 --> Model "Master_model" initialized
+INFO - 2026-09-08 17:50:49 --> File loaded: D:\XAMPP\htdocs\GulHouse\master\application\views\manage/rooms.php
+INFO - 2026-09-08 17:50:49 --> Final output sent to browser
+DEBUG - 2026-09-08 17:50:49 --> Total execution time: 0.0216
+ERROR - 2026-09-08 17:51:32 --> Could not find the specified $config['composer_autoload'] path: D:\XAMPP\htdocs\GulHouse\master\application\../vendor/autoload.php
+INFO - 2026-09-08 17:51:32 --> Config Class Initialized
+INFO - 2026-09-08 17:51:32 --> Hooks Class Initialized
+DEBUG - 2026-09-08 17:51:32 --> UTF-8 Support Enabled
+INFO - 2026-09-08 17:51:32 --> Utf8 Class Initialized
+INFO - 2026-09-08 17:51:32 --> URI Class Initialized
+INFO - 2026-09-08 17:51:32 --> Router Class Initialized
+INFO - 2026-09-08 17:51:32 --> Output Class Initialized
+INFO - 2026-09-08 17:51:32 --> Security Class Initialized
+DEBUG - 2026-09-08 17:51:32 --> Global POST, GET and COOKIE data sanitized
+INFO - 2026-09-08 17:51:32 --> Input Class Initialized
+INFO - 2026-09-08 17:51:32 --> Language Class Initialized
+INFO - 2026-09-08 17:51:32 --> Loader Class Initialized
+INFO - 2026-09-08 17:51:32 --> Helper loaded: url_helper
+INFO - 2026-09-08 17:51:32 --> Helper loaded: html_helper
+INFO - 2026-09-08 17:51:32 --> Helper loaded: form_helper
+INFO - 2026-09-08 17:51:32 --> Helper loaded: security_helper
+INFO - 2026-09-08 17:51:32 --> Database Driver Class Initialized
+INFO - 2026-09-08 17:51:32 --> Session: Class initialized using 'files' driver.
+INFO - 2026-09-08 17:51:32 --> Form Validation Class Initialized
+INFO - 2026-09-08 17:51:32 --> Controller Class Initialized
+INFO - 2026-09-08 17:51:32 --> Model "Master_model" initialized
+INFO - 2026-09-08 17:51:32 --> File loaded: D:\XAMPP\htdocs\GulHouse\master\application\views\manage/tenants.php
+INFO - 2026-09-08 17:51:32 --> Final output sent to browser
+DEBUG - 2026-09-08 17:51:32 --> Total execution time: 0.0301

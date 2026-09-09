@@ -17,7 +17,7 @@ class Landing_model extends CI_Model
             $row = $this->db
                 ->select('COUNT(id) AS total_rooms', FALSE)
                 ->select('SUM(CASE WHEN monthly_price IS NOT NULL AND status = "available" AND is_public = 1 THEN 1 ELSE 0 END) AS available_rooms', FALSE)
-                ->select('MIN(CASE WHEN monthly_price IS NOT NULL AND status = "available" AND is_public = 1 THEN monthly_price END) AS starting_price', FALSE)
+                ->select('MIN(CASE WHEN monthly_price IS NOT NULL AND status NOT IN ("inactive", "mess") THEN monthly_price END) AS starting_price', FALSE)
                 ->get('gh_rooms')
                 ->row_array();
 
@@ -72,13 +72,14 @@ class Landing_model extends CI_Model
                 ->select('CONCAT(p.code, " - ", rt.name) AS name', FALSE)
                 ->select('p.code AS property_code', FALSE)
                 ->select('rt.name AS room_type', FALSE)
-                ->select('COUNT(r.id) AS total_rooms', FALSE)
-                ->select('MIN(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN r.monthly_price END) AS price_from', FALSE)
+                ->select('SUM(CASE WHEN r.monthly_price IS NOT NULL AND r.status NOT IN ("inactive", "mess") THEN 1 ELSE 0 END) AS total_rooms', FALSE)
+                ->select('MIN(CASE WHEN r.monthly_price IS NOT NULL AND r.status NOT IN ("inactive", "mess") THEN r.monthly_price END) AS price_from', FALSE)
                 ->select('SUM(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN 1 ELSE 0 END) AS available_count', FALSE)
                 ->from('gh_rooms r')
                 ->join('gh_properties p', 'p.id = r.property_id', 'left')
                 ->join('gh_room_types rt', 'rt.id = r.room_type_id', 'left')
                 ->group_by('p.id, rt.id')
+                ->having('total_rooms >', 0)
                 ->order_by('p.code', 'ASC')
                 ->order_by('FIELD(rt.name, "Standart", "Deluxe", "VIP")', '', FALSE)
                 ->order_by('rt.name', 'ASC')
@@ -423,6 +424,12 @@ class Landing_model extends CI_Model
 
     public function get_room_gallery(array $room)
     {
+        $uploadedGallery = $this->get_uploaded_room_gallery($room);
+
+        if ($uploadedGallery) {
+            return $uploadedGallery;
+        }
+
         return array(
             array(
                 'category' => 'Kamar',
@@ -465,6 +472,133 @@ class Landing_model extends CI_Model
                 'src' => 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=86',
             ),
         );
+    }
+
+    private function get_uploaded_room_gallery(array $room)
+    {
+        $code = isset($room['code']) ? strtoupper(str_replace(' ', '', (string) $room['code'])) : '';
+        $type = isset($room['type_name']) ? strtoupper(trim((string) $room['type_name'])) : '';
+
+        if ($code !== 'GH2' || $type !== 'VIP') {
+            return array();
+        }
+
+        $directory = realpath(FCPATH . '../uploads/GH2/VIP');
+        $allowed = array('jpg', 'jpeg', 'png', 'webp');
+        $gallery = array();
+
+        if (! $directory || ! is_dir($directory)) {
+            return array();
+        }
+
+        foreach (new DirectoryIterator($directory) as $file) {
+            if (! $file->isFile()) {
+                continue;
+            }
+
+            $extension = strtolower($file->getExtension());
+            if (! in_array($extension, $allowed, TRUE)) {
+                continue;
+            }
+
+            $filename = $file->getFilename();
+            $category = $this->gallery_category_from_filename($filename);
+            $gallery[] = array(
+                'category' => $category,
+                'title' => $this->gallery_title_from_filename($filename, $category),
+                'src' => base_url('index.php/media/gallery/GH2/VIP/' . rawurlencode($filename)),
+            );
+        }
+
+        usort($gallery, function ($left, $right) {
+            $order = array('Kamar' => 1, 'Kamar Mandi' => 2, 'Fasilitas' => 3, 'Area Umum' => 4);
+            $leftOrder = isset($order[$left['category']]) ? $order[$left['category']] : 99;
+            $rightOrder = isset($order[$right['category']]) ? $order[$right['category']] : 99;
+
+            if ($leftOrder === $rightOrder) {
+                return strnatcasecmp($left['title'], $right['title']);
+            }
+
+            return $leftOrder - $rightOrder;
+        });
+
+        return $gallery;
+    }
+
+    private function get_uploaded_room_cover($code, $type)
+    {
+        $code = strtoupper(str_replace(' ', '', (string) $code));
+        $type = strtoupper(trim((string) $type));
+
+        if ($code !== 'GH2' || $type !== 'VIP') {
+            return '';
+        }
+
+        $directory = realpath(FCPATH . '../uploads/GH2/VIP');
+        $allowed = array('jpg', 'jpeg', 'png', 'webp');
+        $files = array();
+
+        if (! $directory || ! is_dir($directory)) {
+            return '';
+        }
+
+        foreach (new DirectoryIterator($directory) as $file) {
+            if (! $file->isFile()) {
+                continue;
+            }
+
+            $extension = strtolower($file->getExtension());
+            if (! in_array($extension, $allowed, TRUE)) {
+                continue;
+            }
+
+            $files[] = $file->getFilename();
+        }
+
+        if (! $files) {
+            return '';
+        }
+
+        usort($files, function ($left, $right) {
+            $leftScore = stripos($left, 'kamar_01') === 0 ? 0 : (stripos($left, 'kamar') === 0 ? 1 : 2);
+            $rightScore = stripos($right, 'kamar_01') === 0 ? 0 : (stripos($right, 'kamar') === 0 ? 1 : 2);
+
+            if ($leftScore === $rightScore) {
+                return strnatcasecmp($left, $right);
+            }
+
+            return $leftScore - $rightScore;
+        });
+
+        return base_url('index.php/media/gallery/GH2/VIP/' . rawurlencode($files[0]));
+    }
+
+    private function gallery_category_from_filename($filename)
+    {
+        $name = strtoupper((string) $filename);
+
+        if (strpos($name, 'MANDI') === 0) {
+            return 'Kamar Mandi';
+        }
+
+        if (strpos($name, 'FASILITAS') === 0) {
+            return 'Fasilitas';
+        }
+
+        return 'Kamar';
+    }
+
+    private function gallery_title_from_filename($filename, $category)
+    {
+        $base = pathinfo((string) $filename, PATHINFO_FILENAME);
+        $base = str_replace(array('_', '-'), ' ', $base);
+        $base = trim(preg_replace('/\s+/', ' ', $base));
+
+        if ($base === '') {
+            return $category . ' GH 2 VIP';
+        }
+
+        return ucwords(strtolower($base)) . ' GH 2 VIP';
     }
 
     public function save_booking_request(array $payload)
@@ -599,6 +733,7 @@ class Landing_model extends CI_Model
                 'total_rooms' => (int) $row['total_rooms'],
                 'available_count' => (int) $row['available_count'],
                 'deposit_estimate' => (int) $row['deposit_estimate'],
+                'cover_image' => $this->get_uploaded_room_cover($row['property_code'], $row['type_name']),
             );
         }
 
@@ -610,16 +745,16 @@ class Landing_model extends CI_Model
         $rows = $this->db
             ->select('p.code AS property_code', FALSE)
             ->select('rt.name AS type_name', FALSE)
-            ->select('COUNT(r.id) AS total_rooms', FALSE)
+            ->select('SUM(CASE WHEN r.monthly_price IS NOT NULL AND r.status NOT IN ("inactive", "mess") THEN 1 ELSE 0 END) AS total_rooms', FALSE)
             ->select('SUM(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN 1 ELSE 0 END) AS available_count', FALSE)
-            ->select('MIN(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN r.monthly_price END) AS price', FALSE)
-            ->select('MAX(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN r.monthly_price END) AS max_price', FALSE)
-            ->select('MIN(CASE WHEN r.deposit IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN r.deposit END) AS deposit_estimate', FALSE)
+            ->select('MIN(CASE WHEN r.monthly_price IS NOT NULL AND r.status NOT IN ("inactive", "mess") THEN r.monthly_price END) AS price', FALSE)
+            ->select('MAX(CASE WHEN r.monthly_price IS NOT NULL AND r.status NOT IN ("inactive", "mess") THEN r.monthly_price END) AS max_price', FALSE)
+            ->select('MIN(CASE WHEN r.deposit IS NOT NULL AND r.status NOT IN ("inactive", "mess") THEN r.deposit END) AS deposit_estimate', FALSE)
             ->from('gh_rooms r')
             ->join('gh_properties p', 'p.id = r.property_id', 'left')
             ->join('gh_room_types rt', 'rt.id = r.room_type_id', 'left')
             ->group_by('p.id, rt.id')
-            ->having('available_count >', 0)
+            ->having('total_rooms >', 0)
             ->order_by('p.code', 'ASC')
             ->order_by('FIELD(rt.name, "Standart", "Deluxe", "VIP")', '', FALSE)
             ->order_by('rt.name', 'ASC')
@@ -635,11 +770,12 @@ class Landing_model extends CI_Model
                 'slug' => $this->create_public_room_slug($row['property_code'], $row['type_name']),
                 'price' => (int) $row['price'],
                 'max_price' => (int) $row['max_price'],
-                'status' => ((int) $row['available_count'] > 0) ? 'available' : 'maintenance',
+                'status' => ((int) $row['available_count'] > 0) ? 'available' : 'full',
                 'type_name' => $row['type_name'],
                 'total_rooms' => (int) $row['total_rooms'],
                 'available_count' => (int) $row['available_count'],
                 'deposit_estimate' => (int) $row['deposit_estimate'],
+                'cover_image' => $this->get_uploaded_room_cover($row['property_code'], $row['type_name']),
             );
         }
 
@@ -664,6 +800,7 @@ class Landing_model extends CI_Model
             $row['slug'] = $this->create_public_room_slug($row['code'], $row['type_name']);
             $row['status'] = ((int) $row['available_count'] > 0) ? 'available' : 'maintenance';
             $row['deposit_estimate'] = 0;
+            $row['cover_image'] = $this->get_uploaded_room_cover($row['code'], $row['type_name']);
             $cards[] = $row;
         }
 
@@ -682,11 +819,12 @@ class Landing_model extends CI_Model
                 'slug' => $this->create_public_room_slug(isset($row['code']) ? $row['code'] : 'GUL HOUSE', $row['type_name']),
                 'price' => (int) $row['price'],
                 'max_price' => (int) $row['max_price'],
-                'status' => $available > 0 ? 'available' : 'maintenance',
+                'status' => $available > 0 ? 'available' : 'full',
                 'type_name' => $row['type_name'],
                 'total_rooms' => (int) $row['total_rooms'],
                 'available_count' => $available,
                 'deposit_estimate' => 0,
+                'cover_image' => $this->get_uploaded_room_cover(isset($row['code']) ? $row['code'] : 'GUL HOUSE', $row['type_name']),
             );
         }
 
@@ -702,7 +840,11 @@ class Landing_model extends CI_Model
 
         $card['notes'] = 'Ringkasan publik per gedung dan tipe kamar.';
         $card['price_label'] = $priceLabel;
-        $card['type_description'] = $card['name'] . ' memiliki ' . (int) $card['available_count'] . ' kamar tersedia dari ' . (int) $card['total_rooms'] . ' kamar. Harga dapat berbeda sesuai fasilitas dan kondisi kamar.';
+        $availabilityText = (int) $card['available_count'] > 0
+            ? (int) $card['available_count'] . ' kamar tersedia dari ' . (int) $card['total_rooms'] . ' kamar'
+            : 'stok publik sedang penuh dari total ' . (int) $card['total_rooms'] . ' kamar';
+
+        $card['type_description'] = $card['name'] . ' memiliki ' . $availabilityText . '. Harga tetap ditampilkan sebagai referensi dan dapat berbeda sesuai fasilitas atau kondisi kamar.';
         $card['public_description'] = 'Pilihan ' . $card['type_name'] . ' di ' . $card['code'] . ' untuk calon penghuni yang ingin survey kamar tanpa memilih nomor kamar terlebih dahulu.';
         $card['facilities'] = array('Kasur', 'Lemari', 'Meja kerja', 'Kursi', 'Akses 24 jam');
 

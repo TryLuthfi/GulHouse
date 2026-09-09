@@ -6,18 +6,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="GUL HOUSE, hunian kos premium siap huni dengan kamar nyaman, fasilitas terawat, dan proses booking mudah.">
     <title><?= html_escape($title); ?></title>
-    <link rel="preload" as="image" href="https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1500&q=76" fetchpriority="high">
+    <?php $heroSlides = isset($hero_slides) && $hero_slides ? $hero_slides : array(); ?>
+    <?php if (! empty($heroSlides[0]['url'])): ?>
+        <link rel="preload" as="image" href="<?= html_escape($heroSlides[0]['url']); ?>" fetchpriority="high">
+    <?php endif; ?>
+    <link rel="preload" as="image" href="<?= base_url('index.php/media/logo'); ?>">
     <link rel="preconnect" href="https://images.unsplash.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/landing/vendor/leaflet/leaflet.css?v=1.9.4'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20260909-logo'); ?>">
 </head>
 <body>
     <header class="site-header" id="top">
         <div class="page-progress" data-page-progress aria-hidden="true"></div>
         <a class="brand" href="<?= base_url(); ?>">
-            <span class="brand-mark">GH</span>
+            <span class="brand-mark"><img src="<?= base_url('index.php/media/logo'); ?>" alt="" width="38" height="38"></span>
             <span>GUL HOUSE</span>
         </a>
         <button type="button" class="menu-toggle" data-menu-toggle aria-expanded="false" aria-label="Buka navigasi">
@@ -39,9 +44,9 @@
     <main>
         <section class="hero" data-hero-slider>
             <div class="hero-slides" aria-hidden="true">
-                <div class="hero-slide is-active" style="--hero-image: url('https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1500&q=76');"></div>
-                <div class="hero-slide" style="--hero-image: url('https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=1500&q=76');"></div>
-                <div class="hero-slide" style="--hero-image: url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1500&q=76');"></div>
+                <?php foreach ($heroSlides as $index => $slide): ?>
+                    <div class="hero-slide <?= $index === 0 ? 'is-active' : ''; ?>" style="--hero-image: url('<?= html_escape($slide['url']); ?>');"></div>
+                <?php endforeach; ?>
             </div>
             <div class="hero-copy reveal">
                 <p class="eyebrow">Kos premium siap huni</p>
@@ -161,6 +166,16 @@
             </div>
         </section>
 
+        <?php
+            $filterProperties = array();
+            $filterRoomTypes = array();
+            foreach ($all_rooms as $room) {
+                $filterProperties[$room['code']] = $room['code'];
+                $filterRoomTypes[$room['type_name']] = $room['type_name'];
+            }
+            ksort($filterProperties);
+            ksort($filterRoomTypes);
+        ?>
         <section class="section room-browser reveal" id="availability">
             <div class="browser-head">
                 <div>
@@ -168,19 +183,42 @@
                     <h2>Cek gedung dan tipe sebelum tanya admin.</h2>
                 </div>
                 <div class="room-filter" data-room-filter>
-                    <button type="button" class="is-active" data-filter="all">Semua</button>
-                    <button type="button" data-filter="available">Tersedia</button>
-                    <button type="button" data-filter="GH 1">GH 1</button>
-                    <button type="button" data-filter="GH 2">GH 2</button>
-                    <button type="button" data-filter="Standart">Standart</button>
-                    <button type="button" data-filter="Deluxe">Deluxe</button>
-                    <button type="button" data-filter="VIP">VIP</button>
+                    <div class="filter-group" data-filter-group="status">
+                        <span>Status</span>
+                        <div>
+                            <button type="button" class="is-active" data-filter-field="status" data-filter-value="all">Semua</button>
+                            <button type="button" data-filter-field="status" data-filter-value="available">Tersedia</button>
+                        </div>
+                    </div>
+                    <div class="filter-group" data-filter-group="property">
+                        <span>Jenis Gedung</span>
+                        <div>
+                            <button type="button" class="is-active" data-filter-field="property" data-filter-value="all">Semua</button>
+                            <?php foreach ($filterProperties as $propertyCode): ?>
+                                <button type="button" data-filter-field="property" data-filter-value="<?= html_escape($propertyCode); ?>"><?= html_escape($propertyCode); ?></button>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <div class="filter-group" data-filter-group="type">
+                        <span>Jenis Kamar</span>
+                        <div>
+                            <button type="button" class="is-active" data-filter-field="type" data-filter-value="all">Semua</button>
+                            <?php foreach ($filterRoomTypes as $typeName): ?>
+                                <button type="button" data-filter-field="type" data-filter-value="<?= html_escape($typeName); ?>"><?= html_escape($typeName); ?></button>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="room-list" data-room-list>
                 <?php foreach ($all_rooms as $index => $room): ?>
+                    <?php $statusLabel = $room['status'] === 'full' ? 'Full' : ucfirst($room['status']); ?>
                     <article class="compact-room reveal delay-<?= ($index % 4); ?>" data-room-card data-status="<?= html_escape($room['status']); ?>" data-property="<?= html_escape($room['code']); ?>" data-type="<?= html_escape($room['type_name']); ?>">
-                        <div class="compact-photo photo-<?= ($index % 3) + 1; ?>"></div>
+                        <div
+                            class="compact-photo photo-<?= ($index % 3) + 1; ?>"
+                            <?php if (! empty($room['cover_image'])): ?>
+                                style="background-image: url('<?= html_escape($room['cover_image']); ?>');"
+                            <?php endif; ?>></div>
                         <div>
                             <span><?= (int) $room['available_count']; ?> tersedia dari <?= (int) $room['total_rooms']; ?> kamar</span>
                             <h3><?= html_escape($room['name']); ?></h3>
@@ -193,7 +231,7 @@
                             </p>
                         </div>
                         <div class="compact-actions">
-                            <span class="status-pill status-<?= html_escape($room['status']); ?>"><?= html_escape(ucfirst($room['status'])); ?></span>
+                            <span class="status-pill status-<?= html_escape($room['status']); ?>"><?= html_escape($statusLabel); ?></span>
                             <a href="<?= base_url('rooms/' . html_escape($room['slug'])); ?>">Detail</a>
                         </div>
                     </article>
@@ -219,7 +257,12 @@
             <div class="room-carousel" data-carousel>
                 <?php foreach ($featured_rooms as $index => $room): ?>
                     <article class="room-card" data-carousel-slide>
-                        <div class="room-photo photo-<?= ($index % 3) + 1; ?>" data-parallax-card></div>
+                        <div
+                            class="room-photo photo-<?= ($index % 3) + 1; ?>"
+                            data-parallax-card
+                            <?php if (! empty($room['cover_image'])): ?>
+                                style="background-image: url('<?= html_escape($room['cover_image']); ?>');"
+                            <?php endif; ?>></div>
                         <div class="room-body">
                             <span><?= html_escape($room['code']); ?></span>
                             <h3><?= html_escape($room['name']); ?></h3>
@@ -324,13 +367,43 @@
             </div>
         </section>
 
+        <?php
+            $propertyMaps = array(
+                array(
+                    'code' => 'GH 1',
+                    'name' => 'Gulhouse 1',
+                    'address' => 'Jl. H. Muchtar Raya No.96, RT.6/RW.8, Joglo, Kec. Kembangan, Kota Jakarta Barat, DKI Jakarta 11640',
+                    'maps_url' => 'https://maps.app.goo.gl/XbAsDanWesr3FpMKA',
+                    'lat' => -6.22342,
+                    'lng' => 106.73698,
+                ),
+                array(
+                    'code' => 'GH 2',
+                    'name' => 'Gulhouse 2',
+                    'address' => 'Jl. H. Muchtar Raya No.2a, RT.9/RW.8, Joglo, Kec. Kembangan, Kota Jakarta Barat, DKI Jakarta 11640',
+                    'maps_url' => 'https://maps.app.goo.gl/9XBSHXUQEM547QXp9',
+                    'lat' => -6.22357,
+                    'lng' => 106.73724,
+                ),
+            );
+        ?>
         <section class="section location-section" id="location">
-            <div class="location-map reveal">
-                <div class="map-pin" role="img" aria-label="Lokasi GUL HOUSE"></div>
-            </div>
             <div class="location-copy reveal delay-1">
                 <p class="eyebrow">Lokasi</p>
                 <h2>Dibuat mudah untuk aktivitas harian.</h2>
+                <p>GH 1 dan GH 2 berada di area yang sama di Joglo, Kembangan. Dua marker ditampilkan dalam satu peta agar calon penghuni langsung paham posisi masing-masing gedung.</p>
+                <div class="map-tabs" role="tablist" aria-label="Pilih lokasi Gulhouse">
+                    <?php foreach ($propertyMaps as $index => $map): ?>
+                        <button
+                            type="button"
+                            class="<?= $index === 0 ? 'is-active' : ''; ?>"
+                            data-map-tab="<?= html_escape($map['code']); ?>"
+                            aria-selected="<?= $index === 0 ? 'true' : 'false'; ?>">
+                            <span><?= html_escape($map['code']); ?></span>
+                            <?= html_escape($map['name']); ?>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
                 <div class="nearby-list">
                     <?php foreach ($nearby_places as $place): ?>
                         <div>
@@ -338,6 +411,28 @@
                             <span><?= html_escape($place['distance']); ?></span>
                         </div>
                     <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="location-map-shell reveal" data-map-switcher>
+                <div class="location-map" data-map-canvas>
+                    <div class="map-fallback" aria-hidden="true">
+                        <span>GH1</span>
+                        <span>GH2</span>
+                    </div>
+                </div>
+                <div class="map-card-list">
+                <?php foreach ($propertyMaps as $index => $map): ?>
+                    <article
+                        class="map-card <?= $index === 0 ? 'is-active' : ''; ?>"
+                        data-map-panel="<?= html_escape($map['code']); ?>"
+                        data-map-lat="<?= html_escape($map['lat']); ?>"
+                        data-map-lng="<?= html_escape($map['lng']); ?>">
+                        <span><?= html_escape($map['code']); ?></span>
+                        <strong><?= html_escape($map['name']); ?></strong>
+                        <p><?= html_escape($map['address']); ?></p>
+                        <a href="<?= html_escape($map['maps_url']); ?>" target="_blank" rel="noopener">Buka Google Maps</a>
+                    </article>
+                <?php endforeach; ?>
                 </div>
             </div>
         </section>
@@ -467,6 +562,7 @@
         <a href="https://wa.me/6280000000000" target="_blank" rel="noopener">WhatsApp</a>
         <a href="#booking">Booking</a>
     </div>
-    <script defer src="<?= base_url('assets/landing/js/landing.js'); ?>"></script>
+    <script defer src="<?= base_url('assets/landing/vendor/leaflet/leaflet.js?v=1.9.4'); ?>"></script>
+    <script defer src="<?= base_url('assets/landing/js/landing.js?v=20260909-logo'); ?>"></script>
 </body>
 </html>

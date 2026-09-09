@@ -631,32 +631,146 @@
             return;
         }
 
-        filter.querySelectorAll('button').forEach(function (button) {
-            button.addEventListener('click', function () {
-                var value = button.getAttribute('data-filter');
+        var state = {
+            status: 'all',
+            property: 'all',
+            type: 'all'
+        };
 
-                filter.querySelectorAll('button').forEach(function (item) {
+        function updateEmptyState() {
+            if (!empty) {
+                return;
+            }
+
+            var visibleCards = cards.filter(function (card) {
+                return !card.classList.contains('is-hidden');
+            });
+            empty.classList.toggle('is-visible', visibleCards.length === 0);
+            empty.setAttribute('aria-hidden', visibleCards.length === 0 ? 'false' : 'true');
+        }
+
+        function applyFilters() {
+            cards.forEach(function (card) {
+                var statusMatch = state.status === 'all' || card.getAttribute('data-status') === state.status;
+                var propertyMatch = state.property === 'all' || card.getAttribute('data-property') === state.property;
+                var typeMatch = state.type === 'all' || card.getAttribute('data-type') === state.type;
+                card.classList.toggle('is-hidden', !(statusMatch && propertyMatch && typeMatch));
+            });
+
+            updateEmptyState();
+        }
+
+        filter.querySelectorAll('button[data-filter-field]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var field = button.getAttribute('data-filter-field');
+                var value = button.getAttribute('data-filter-value');
+                var group = button.closest('[data-filter-group]');
+
+                if (!field || !Object.prototype.hasOwnProperty.call(state, field)) {
+                    return;
+                }
+
+                state[field] = value || 'all';
+
+                (group || filter).querySelectorAll('button[data-filter-field="' + field + '"]').forEach(function (item) {
                     item.classList.toggle('is-active', item === button);
                 });
 
-                cards.forEach(function (card) {
-                    var match = value === 'all'
-                        || card.getAttribute('data-status') === value
-                        || card.getAttribute('data-property') === value
-                        || card.getAttribute('data-type') === value;
-
-                    card.classList.toggle('is-hidden', !match);
-                });
-
-                if (empty) {
-                    var visibleCards = cards.filter(function (card) {
-                        return !card.classList.contains('is-hidden');
-                    });
-                    empty.classList.toggle('is-visible', visibleCards.length === 0);
-                    empty.setAttribute('aria-hidden', visibleCards.length === 0 ? 'false' : 'true');
-                }
+                applyFilters();
             });
         });
+
+        applyFilters();
+    }
+
+    function initMapSwitcher() {
+        var switcher = document.querySelector('[data-map-switcher]');
+        var tabs = Array.prototype.slice.call(document.querySelectorAll('[data-map-tab]'));
+
+        if (!switcher || !tabs.length) {
+            return;
+        }
+
+        var panels = Array.prototype.slice.call(switcher.querySelectorAll('[data-map-panel]'));
+        var canvas = switcher.querySelector('[data-map-canvas]');
+        var map = null;
+        var markers = {};
+
+        function setActive(code) {
+            tabs.forEach(function (tab) {
+                var active = tab.getAttribute('data-map-tab') === code;
+                tab.classList.toggle('is-active', active);
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+
+            panels.forEach(function (panel) {
+                panel.classList.toggle('is-active', panel.getAttribute('data-map-panel') === code);
+            });
+
+            if (map && markers[code]) {
+                map.flyTo(markers[code].getLatLng(), 18, {
+                    animate: !prefersReducedMotion,
+                    duration: .8
+                });
+                markers[code].openPopup();
+            }
+        }
+
+        tabs.forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                setActive(tab.getAttribute('data-map-tab'));
+            });
+        });
+
+        if (canvas && window.L && panels.length) {
+            map = window.L.map(canvas, {
+                scrollWheelZoom: false,
+                zoomControl: true
+            });
+
+            window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(map);
+
+            var bounds = [];
+
+            panels.forEach(function (panel) {
+                var code = panel.getAttribute('data-map-panel');
+                var name = panel.querySelector('strong') ? panel.querySelector('strong').textContent : code;
+                var lat = parseFloat(panel.getAttribute('data-map-lat'));
+                var lng = parseFloat(panel.getAttribute('data-map-lng'));
+
+                if (!code || Number.isNaN(lat) || Number.isNaN(lng)) {
+                    return;
+                }
+
+                var icon = window.L.divIcon({
+                    className: '',
+                    html: '<div class="map-marker"><span>' + code.replace(' ', '') + '</span></div>',
+                    iconSize: [42, 42],
+                    iconAnchor: [21, 42],
+                    popupAnchor: [0, -36]
+                });
+
+                markers[code] = window.L.marker([lat, lng], { icon: icon })
+                    .addTo(map)
+                    .bindPopup('<strong>' + name + '</strong>');
+                bounds.push([lat, lng]);
+            });
+
+            if (bounds.length > 1) {
+                map.fitBounds(bounds, { padding: [72, 72], maxZoom: 18 });
+            } else if (bounds.length === 1) {
+                map.setView(bounds[0], 18);
+            }
+
+            window.setTimeout(function () {
+                map.invalidateSize();
+            }, 300);
+        }
+
+        setActive(tabs[0].getAttribute('data-map-tab'));
     }
 
     setHeaderState();
@@ -673,4 +787,5 @@
     initDetailStickyBar();
     initPhotoModal();
     initRoomFilter();
+    initMapSwitcher();
 }());

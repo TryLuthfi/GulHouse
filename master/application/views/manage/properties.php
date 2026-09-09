@@ -18,6 +18,7 @@
             <a class="is-active" href="<?= base_url('properties'); ?>">Properti</a>
             <a href="<?= base_url('room-types'); ?>">Tipe Kamar</a>
             <a href="<?= base_url('rooms'); ?>">Kamar</a>
+            <a href="<?= base_url('tenants'); ?>">Penghuni</a>
             <a href="#">Booking</a>
         </nav>
     </aside>

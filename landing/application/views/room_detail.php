@@ -9,12 +9,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css'); ?>">
+    <link rel="preload" as="image" href="<?= base_url('index.php/media/logo'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20260909-gallery'); ?>">
 </head>
 <body class="detail-page">
     <header class="site-header" id="top">
         <a class="brand" href="<?= base_url(); ?>" aria-label="GUL HOUSE">
-            <span class="brand-mark">GH</span>
+            <span class="brand-mark"><img src="<?= base_url('index.php/media/logo'); ?>" alt="" width="38" height="38"></span>
             <span>GUL HOUSE</span>
         </a>
         <nav class="nav-links" aria-label="Navigasi utama">
@@ -165,7 +166,11 @@
             <div class="room-carousel">
                 <?php foreach ($similar_rooms as $index => $similar): ?>
                     <article class="room-card">
-                        <div class="room-photo photo-<?= ($index % 3) + 1; ?>"></div>
+                        <div
+                            class="room-photo photo-<?= ($index % 3) + 1; ?>"
+                            <?php if (! empty($similar['cover_image'])): ?>
+                                style="background-image: url('<?= html_escape($similar['cover_image']); ?>');"
+                            <?php endif; ?>></div>
                         <div class="room-body">
                             <span><?= html_escape($similar['code']); ?></span>
                             <h3><?= html_escape($similar['name']); ?></h3>
@@ -209,7 +214,6 @@
     <script>
         window.GH_ROOM_GALLERY = <?= json_encode($gallery); ?>;
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
-    <script src="<?= base_url('assets/landing/js/landing.js'); ?>"></script>
+    <script src="<?= base_url('assets/landing/js/landing.js?v=20260909-gallery'); ?>"></script>
 </body>
 </html>

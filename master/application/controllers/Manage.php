@@ -123,6 +123,55 @@ class Manage extends CI_Controller
         redirect('rooms');
     }
 
+    public function tenants()
+    {
+        $this->load->view('manage/tenants', array(
+            'title' => 'Penghuni | GUL HOUSE',
+            'admin_name' => $this->session->userdata('gh_admin_name'),
+            'rows' => $this->Master_model->get_tenant_stays(),
+            'rooms' => $this->Master_model->get_active_rooms_for_stay(),
+        ));
+    }
+
+    public function save_tenant()
+    {
+        $payload = array(
+            'stay_id' => (int) $this->input->post('stay_id'),
+            'tenant_id' => (int) $this->input->post('tenant_id'),
+            'room_id' => (int) $this->input->post('room_id'),
+            'stay_status' => trim((string) $this->input->post('stay_status', TRUE)),
+            'fullname' => trim((string) $this->input->post('fullname', TRUE)),
+            'birth_place_date' => trim((string) $this->input->post('birth_place_date', TRUE)),
+            'religion' => trim((string) $this->input->post('religion', TRUE)),
+            'identity_number' => preg_replace('/[^0-9]/', '', (string) $this->input->post('identity_number', TRUE)),
+            'phone' => trim((string) $this->input->post('phone', TRUE)),
+            'marital_status' => trim((string) $this->input->post('marital_status', TRUE)),
+            'occupation' => trim((string) $this->input->post('occupation', TRUE)),
+            'address' => trim((string) $this->input->post('address', TRUE)),
+            'emergency_name' => trim((string) $this->input->post('emergency_name', TRUE)),
+            'emergency_relationship' => trim((string) $this->input->post('emergency_relationship', TRUE)),
+            'emergency_phone' => trim((string) $this->input->post('emergency_phone', TRUE)),
+            'check_in_date' => $this->nullable_date($this->input->post('check_in_date')),
+            'check_out_date' => $this->nullable_date($this->input->post('check_out_date')),
+            'monthly_price' => $this->nullable_money($this->input->post('monthly_price')),
+            'deposit' => $this->nullable_money($this->input->post('deposit')),
+            'source_period' => trim((string) $this->input->post('source_period', TRUE)),
+            'source_unit_name' => trim((string) $this->input->post('source_unit_name', TRUE)),
+            'notes' => trim((string) $this->input->post('notes', TRUE)),
+        );
+
+        $ok = $this->Master_model->save_tenant_stay($payload);
+        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Data penghuni tersimpan.' : 'Data penghuni belum tersimpan.');
+        redirect('tenants');
+    }
+
+    public function end_tenant_stay($id)
+    {
+        $ok = $this->Master_model->end_tenant_stay((int) $id);
+        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Stay penghuni diakhiri dan kamar dibuka kembali.' : 'Stay belum bisa diakhiri.');
+        redirect('tenants');
+    }
+
     private function nullable_int($value)
     {
         $value = trim((string) $value);
@@ -133,6 +182,12 @@ class Manage extends CI_Controller
     {
         $value = preg_replace('/[^0-9]/', '', (string) $value);
         return $value === '' ? null : (int) $value;
+    }
+
+    private function nullable_date($value)
+    {
+        $value = trim((string) $value);
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : null;
     }
 
     private function require_login()

@@ -344,6 +344,14 @@ th {
     grid-template-columns: repeat(4, 1fr);
 }
 
+.tenant-form {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.tenant-form .full {
+    grid-column: 1 / -1;
+}
+
 .manage-form label {
     display: grid;
     gap: 7px;
@@ -483,6 +491,18 @@ th {
     background: #fff5df;
 }
 
+.badge.active {
+    color: #14523d;
+    background: #eaf7f0;
+}
+
+.badge.internal,
+.badge.empty,
+.badge.ended {
+    color: #69736f;
+    background: #eef1ef;
+}
+
 .modal {
     position: fixed;
     inset: 0;
@@ -605,7 +625,8 @@ th {
         grid-template-columns: 1fr 1fr;
     }
 
-    .room-form {
+    .room-form,
+    .tenant-form {
         grid-template-columns: repeat(2, 1fr);
     }
 }
@@ -615,7 +636,8 @@ th {
     .panel-grid,
     .chart-grid,
     .manage-grid,
-    .room-form {
+    .room-form,
+    .tenant-form {
         grid-template-columns: 1fr;
     }
 
