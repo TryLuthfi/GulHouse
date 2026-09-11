@@ -476,14 +476,16 @@ class Landing_model extends CI_Model
 
     private function get_uploaded_room_gallery(array $room)
     {
-        $code = isset($room['code']) ? strtoupper(str_replace(' ', '', (string) $room['code'])) : '';
-        $type = isset($room['type_name']) ? strtoupper(trim((string) $room['type_name'])) : '';
+        $code = isset($room['code']) ? $this->folder_key($room['code']) : '';
+        $type = isset($room['type_name']) ? $this->folder_key($room['type_name']) : '';
+        $labelCode = isset($room['code']) ? (string) $room['code'] : '';
+        $labelType = isset($room['type_name']) ? (string) $room['type_name'] : '';
 
-        if ($code !== 'GH2' || $type !== 'VIP') {
+        if ($code === '' || $type === '') {
             return array();
         }
 
-        $directory = realpath(FCPATH . '../uploads/GH2/VIP');
+        $directory = realpath(FCPATH . '../uploads/' . $code . '/' . $type);
         $allowed = array('jpg', 'jpeg', 'png', 'webp');
         $gallery = array();
 
@@ -505,8 +507,8 @@ class Landing_model extends CI_Model
             $category = $this->gallery_category_from_filename($filename);
             $gallery[] = array(
                 'category' => $category,
-                'title' => $this->gallery_title_from_filename($filename, $category),
-                'src' => base_url('index.php/media/gallery/GH2/VIP/' . rawurlencode($filename)),
+                'title' => $this->gallery_title_from_filename($filename, $category, $labelCode, $labelType),
+                'src' => base_url('index.php/media/gallery/' . rawurlencode($code) . '/' . rawurlencode($type) . '/' . rawurlencode($filename)),
             );
         }
 
@@ -527,14 +529,14 @@ class Landing_model extends CI_Model
 
     private function get_uploaded_room_cover($code, $type)
     {
-        $code = strtoupper(str_replace(' ', '', (string) $code));
-        $type = strtoupper(trim((string) $type));
+        $code = $this->folder_key($code);
+        $type = $this->folder_key($type);
 
-        if ($code !== 'GH2' || $type !== 'VIP') {
+        if ($code === '' || $type === '') {
             return '';
         }
 
-        $directory = realpath(FCPATH . '../uploads/GH2/VIP');
+        $directory = realpath(FCPATH . '../uploads/' . $code . '/' . $type);
         $allowed = array('jpg', 'jpeg', 'png', 'webp');
         $files = array();
 
@@ -570,7 +572,7 @@ class Landing_model extends CI_Model
             return $leftScore - $rightScore;
         });
 
-        return base_url('index.php/media/gallery/GH2/VIP/' . rawurlencode($files[0]));
+        return base_url('index.php/media/gallery/' . rawurlencode($code) . '/' . rawurlencode($type) . '/' . rawurlencode($files[0]));
     }
 
     private function gallery_category_from_filename($filename)
@@ -585,20 +587,25 @@ class Landing_model extends CI_Model
             return 'Fasilitas';
         }
 
+        if (strpos($name, 'UMUM') === 0 || strpos($name, 'AREA') === 0) {
+            return 'Area Umum';
+        }
+
         return 'Kamar';
     }
 
-    private function gallery_title_from_filename($filename, $category)
+    private function gallery_title_from_filename($filename, $category, $code, $type)
     {
         $base = pathinfo((string) $filename, PATHINFO_FILENAME);
         $base = str_replace(array('_', '-'), ' ', $base);
         $base = trim(preg_replace('/\s+/', ' ', $base));
+        $suffix = trim($code . ' ' . $type);
 
         if ($base === '') {
-            return $category . ' GH 2 VIP';
+            return trim($category . ' ' . $suffix);
         }
 
-        return ucwords(strtolower($base)) . ' GH 2 VIP';
+        return trim(ucwords(strtolower($base)) . ' ' . $suffix);
     }
 
     public function save_booking_request(array $payload)
@@ -861,6 +868,11 @@ class Landing_model extends CI_Model
         $value = strtolower(trim((string) $value));
         $value = preg_replace('/[^a-z0-9]+/', '-', $value);
         return trim($value, '-');
+    }
+
+    private function folder_key($value)
+    {
+        return preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $value));
     }
 
     private function pick_featured_gh_rooms(array $rows, $limit)

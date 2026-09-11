@@ -80,12 +80,12 @@ class Home extends CI_Controller
             'webp' => 'image/webp',
         );
 
-        if ($property !== 'GH2' || $type !== 'VIP' || ! isset($mimeTypes[$extension])) {
+        if ($property === '' || $type === '' || ! isset($mimeTypes[$extension])) {
             show_404();
             return;
         }
 
-        $directory = realpath(FCPATH . '../uploads/GH2/VIP');
+        $directory = realpath(FCPATH . '../uploads/' . $this->folder_key($property) . '/' . $this->folder_key($type));
         $path = $directory ? realpath($directory . DIRECTORY_SEPARATOR . $filename) : FALSE;
 
         if (! $directory || ! $path || strpos($path, $directory) !== 0 || ! is_file($path)) {
@@ -184,6 +184,11 @@ class Home extends CI_Controller
         }
 
         return $directory . DIRECTORY_SEPARATOR . basename((string) $filename);
+    }
+
+    private function folder_key($value)
+    {
+        return preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $value));
     }
 
     private function fallback_slider_images()
