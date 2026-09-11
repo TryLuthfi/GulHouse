@@ -137,6 +137,7 @@ class Manage extends CI_Controller
             'admin_name' => $this->session->userdata('gh_admin_name'),
             'properties' => $properties,
             'room_types' => $roomTypes,
+            'room_catalog' => $this->Master_model->get_rooms_for_payment_filters(),
             'selected_property' => $selectedProperty,
             'selected_type' => $selectedType,
             'slider_photos' => $this->list_slider_photos(),
@@ -285,6 +286,8 @@ class Manage extends CI_Controller
             'admin_name' => $this->session->userdata('gh_admin_name'),
             'rows' => $this->Master_model->get_tenant_stays(),
             'rooms' => $this->Master_model->get_active_rooms_for_stay(),
+            'properties' => $this->Master_model->get_active_properties(),
+            'room_types' => $this->Master_model->get_active_room_types(),
         ));
     }
 
@@ -327,6 +330,76 @@ class Manage extends CI_Controller
         redirect('tenants');
     }
 
+    public function payments()
+    {
+        $filters = array(
+            'period_id' => (int) $this->input->get('period_id'),
+            'property_id' => (int) $this->input->get('property_id'),
+            'room_type_id' => (int) $this->input->get('room_type_id'),
+            'room_id' => (int) $this->input->get('room_id'),
+            'status' => trim((string) $this->input->get('status', TRUE)),
+            'q' => trim((string) $this->input->get('q', TRUE)),
+        );
+
+        $this->load->view('manage/payments', array(
+            'title' => 'Pembayaran | GUL HOUSE',
+            'admin_name' => $this->session->userdata('gh_admin_name'),
+            'periods' => $this->Master_model->get_billing_periods(),
+            'properties' => $this->Master_model->get_active_properties(),
+            'room_types' => $this->Master_model->get_active_room_types(),
+            'rooms' => $this->Master_model->get_rooms_for_payment_filters(),
+            'filters' => $filters,
+            'summary' => $this->Master_model->get_payment_summary($filters),
+            'rows' => $this->Master_model->get_payment_bills($filters),
+            'issues' => $this->Master_model->get_payment_import_issues(),
+        ));
+    }
+
+    public function save_payment_bill()
+    {
+        $payload = array(
+            'bill_id' => (int) $this->input->post('bill_id'),
+            'base_price' => $this->nullable_money($this->input->post('base_price')),
+            'deposit_amount' => $this->nullable_money($this->input->post('deposit_amount')),
+            'due_date' => $this->nullable_date($this->input->post('due_date')),
+            'paid_total' => $this->nullable_money($this->input->post('paid_total')),
+            'past_due_amount' => $this->nullable_money($this->input->post('past_due_amount')),
+            'future_due_amount' => $this->nullable_money($this->input->post('future_due_amount')),
+            'bill_status' => trim((string) $this->input->post('bill_status', TRUE)),
+            'notes' => trim((string) $this->input->post('notes', TRUE)),
+        );
+
+        $ok = $this->Master_model->save_payment_bill($payload);
+        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Bill pembayaran tersimpan.' : 'Bill pembayaran belum tersimpan.');
+        redirect($this->payment_redirect_url());
+    }
+
+    public function save_payment()
+    {
+        $payload = array(
+            'payment_id' => (int) $this->input->post('payment_id'),
+            'room_bill_id' => (int) $this->input->post('room_bill_id'),
+            'payment_date' => $this->nullable_date($this->input->post('payment_date')),
+            'payment_date_text' => trim((string) $this->input->post('payment_date_text', TRUE)),
+            'amount' => $this->nullable_money($this->input->post('amount')),
+            'payment_type' => trim((string) $this->input->post('payment_type', TRUE)),
+            'method' => trim((string) $this->input->post('method', TRUE)),
+            'reference_no' => trim((string) $this->input->post('reference_no', TRUE)),
+            'notes' => trim((string) $this->input->post('notes', TRUE)),
+        );
+
+        $ok = $this->Master_model->save_payment($payload);
+        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Pembayaran tersimpan.' : 'Pembayaran belum tersimpan.');
+        redirect($this->payment_redirect_url());
+    }
+
+    public function delete_payment($id)
+    {
+        $ok = $this->Master_model->delete_payment((int) $id);
+        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Pembayaran dihapus.' : 'Pembayaran belum bisa dihapus.');
+        redirect($this->payment_redirect_url());
+    }
+
     private function nullable_int($value)
     {
         $value = trim((string) $value);
@@ -343,6 +416,19 @@ class Manage extends CI_Controller
     {
         $value = trim((string) $value);
         return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : null;
+    }
+
+    private function payment_redirect_url()
+    {
+        $params = array();
+        foreach (array('period_id', 'property_id', 'room_type_id', 'room_id', 'status', 'q') as $key) {
+            $value = trim((string) $this->input->post_get($key, TRUE));
+            if ($value !== '') {
+                $params[$key] = $value;
+            }
+        }
+
+        return 'payments' . ($params ? '?' . http_build_query($params) : '');
     }
 
     private function list_slider_photos()

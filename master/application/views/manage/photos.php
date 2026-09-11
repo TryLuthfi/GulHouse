@@ -2,6 +2,18 @@
 <?php
     $selectedProperty = isset($selected_property) ? $selected_property : '';
     $selectedType = isset($selected_type) ? $selected_type : '';
+    $typePropertyMap = array();
+    foreach ($room_catalog as $room) {
+        $typeName = (string) $room['type_name'];
+        $propertyCode = (string) $room['property_code'];
+        if ($typeName === '' || $propertyCode === '') {
+            continue;
+        }
+        if (empty($typePropertyMap[$typeName])) {
+            $typePropertyMap[$typeName] = array();
+        }
+        $typePropertyMap[$typeName][$propertyCode] = $propertyCode;
+    }
 ?>
 <!doctype html>
 <html lang="id">
@@ -12,7 +24,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20260910-photo-tools'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20260911-cascade'); ?>">
 </head>
 <body>
     <aside class="sidebar">
@@ -23,6 +35,7 @@
             <a href="<?= base_url('room-types'); ?>">Tipe Kamar</a>
             <a href="<?= base_url('rooms'); ?>">Kamar</a>
             <a href="<?= base_url('tenants'); ?>">Penghuni</a>
+            <a href="<?= base_url('payments'); ?>">Pembayaran</a>
             <a class="is-active" href="<?= base_url('photos'); ?>">Foto</a>
             <a href="#">Booking</a>
         </nav>
@@ -85,9 +98,9 @@
                 </div>
                 <button type="button" class="mini-link" data-open-modal="#room-upload-modal">Upload Foto Kamar</button>
             </div>
-            <form class="filter-form" method="get" action="<?= base_url('photos'); ?>">
+            <form class="filter-form" method="get" action="<?= base_url('photos'); ?>" data-photo-cascade-form>
                 <label>Gedung
-                    <select name="property">
+                    <select name="property" data-photo-property>
                         <option value="">Pilih gedung</option>
                         <?php foreach ($properties as $property): ?>
                             <option value="<?= html_escape($property['code']); ?>" <?= $selectedProperty === $property['code'] ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
@@ -95,10 +108,11 @@
                     </select>
                 </label>
                 <label>Tipe Kamar
-                    <select name="type">
+                    <select name="type" data-photo-type data-cascade-template="photo-room-types">
                         <option value="">Pilih tipe</option>
                         <?php foreach ($room_types as $type): ?>
-                            <option value="<?= html_escape($type['name']); ?>" <?= $selectedType === $type['name'] ? 'selected' : ''; ?>><?= html_escape($type['name']); ?></option>
+                            <?php $propertyCodes = ! empty($typePropertyMap[$type['name']]) ? implode(',', array_values($typePropertyMap[$type['name']])) : ''; ?>
+                            <option value="<?= html_escape($type['name']); ?>" data-property-codes="<?= html_escape($propertyCodes); ?>" <?= $selectedType === $type['name'] ? 'selected' : ''; ?>><?= html_escape($type['name']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </label>
@@ -180,7 +194,7 @@
                     <div class="room-upload-row" data-room-upload-row>
                         <input type="hidden" name="upload_rows[0][field]" value="photos_0" data-room-upload-field>
                         <label>Gedung
-                            <select name="upload_rows[0][property_code]" required data-room-upload-name="property_code">
+                            <select name="upload_rows[0][property_code]" required data-room-upload-name="property_code" data-photo-property>
                                 <option value="">Pilih gedung</option>
                                 <?php foreach ($properties as $property): ?>
                                     <option value="<?= html_escape($property['code']); ?>" <?= $selectedProperty === $property['code'] ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
@@ -188,10 +202,11 @@
                             </select>
                         </label>
                         <label>Tipe Kamar
-                            <select name="upload_rows[0][room_type]" required data-room-upload-name="room_type">
+                            <select name="upload_rows[0][room_type]" required data-room-upload-name="room_type" data-photo-type data-cascade-template="photo-room-types">
                                 <option value="">Pilih tipe</option>
                                 <?php foreach ($room_types as $type): ?>
-                                    <option value="<?= html_escape($type['name']); ?>" <?= $selectedType === $type['name'] ? 'selected' : ''; ?>><?= html_escape($type['name']); ?></option>
+                                    <?php $propertyCodes = ! empty($typePropertyMap[$type['name']]) ? implode(',', array_values($typePropertyMap[$type['name']])) : ''; ?>
+                                    <option value="<?= html_escape($type['name']); ?>" data-property-codes="<?= html_escape($propertyCodes); ?>" <?= $selectedType === $type['name'] ? 'selected' : ''; ?>><?= html_escape($type['name']); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </label>
@@ -261,6 +276,6 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js?v=20260910-photo-tools'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20260911-cascade'); ?>"></script>
 </body>
 </html>

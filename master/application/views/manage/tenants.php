@@ -38,6 +38,20 @@
         'emergency_phone' => '',
     );
     $modalRows = array_merge(array($emptyStay), $rows);
+    $roomLookup = array();
+    $typePropertyMap = array();
+    foreach ($rooms as $room) {
+        $roomLookup[(int) $room['id']] = $room;
+        $typeId = (int) $room['room_type_id'];
+        $propertyId = (int) $room['property_id'];
+        if ($typeId <= 0 || $propertyId <= 0) {
+            continue;
+        }
+        if (empty($typePropertyMap[$typeId])) {
+            $typePropertyMap[$typeId] = array();
+        }
+        $typePropertyMap[$typeId][$propertyId] = $propertyId;
+    }
 ?>
 <!doctype html>
 <html lang="id">
@@ -48,7 +62,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20260911-cascade'); ?>">
 </head>
 <body>
     <aside class="sidebar">
@@ -59,6 +73,7 @@
             <a href="<?= base_url('room-types'); ?>">Tipe Kamar</a>
             <a href="<?= base_url('rooms'); ?>">Kamar</a>
             <a class="is-active" href="<?= base_url('tenants'); ?>">Penghuni</a>
+            <a href="<?= base_url('payments'); ?>">Pembayaran</a>
             <a href="<?= base_url('photos'); ?>">Foto</a>
             <a href="#">Booking</a>
         </nav>
@@ -144,18 +159,43 @@
 
     <?php foreach ($modalRows as $modalRow): ?>
         <?php $isCreate = (int) $modalRow['id'] === 0; ?>
+        <?php
+            $selectedRoom = isset($roomLookup[(int) $modalRow['room_id']]) ? $roomLookup[(int) $modalRow['room_id']] : null;
+            $selectedPropertyId = $selectedRoom ? (int) $selectedRoom['property_id'] : 0;
+            $selectedTypeId = $selectedRoom ? (int) $selectedRoom['room_type_id'] : 0;
+        ?>
         <div class="modal wide" id="<?= $isCreate ? 'tenant-create-modal' : 'tenant-edit-' . (int) $modalRow['id']; ?>" aria-hidden="true">
             <div class="modal-backdrop" data-close-modal></div>
             <section class="modal-card wide">
                 <div class="modal-head"><h2><?= $isCreate ? 'Tambah Penghuni' : 'Edit ' . html_escape($modalRow['fullname'] ? $modalRow['fullname'] : $modalRow['source_unit_name']); ?></h2><button type="button" data-close-modal>x</button></div>
-                <form class="manage-form tenant-form" method="post" action="<?= base_url('tenants/save'); ?>" data-confirm-submit>
+                <form class="manage-form tenant-form" method="post" action="<?= base_url('tenants/save'); ?>" data-confirm-submit data-tenant-cascade-form>
                     <input type="hidden" name="stay_id" value="<?= (int) $modalRow['id']; ?>">
                     <input type="hidden" name="tenant_id" value="<?= (int) $modalRow['tenant_id']; ?>">
+                    <label>Properti
+                        <select data-tenant-property-filter>
+                            <option value="">Semua properti</option>
+                            <?php foreach ($properties as $property): ?>
+                                <option value="<?= (int) $property['id']; ?>" <?= $selectedPropertyId === (int) $property['id'] ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <label>Tipe Kamar
+                        <select data-tenant-type-filter data-cascade-template="tenant-room-types">
+                            <option value="">Semua tipe</option>
+                            <?php foreach ($room_types as $type): ?>
+                                <?php
+                                    $typeId = (int) $type['id'];
+                                    $propertyIds = ! empty($typePropertyMap[$typeId]) ? implode(',', array_values($typePropertyMap[$typeId])) : '';
+                                ?>
+                                <option value="<?= $typeId; ?>" data-property-ids="<?= html_escape($propertyIds); ?>" <?= $selectedTypeId === $typeId ? 'selected' : ''; ?>><?= html_escape($type['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
                     <label>Unit
-                        <select name="room_id" required>
+                        <select name="room_id" required data-tenant-room-select data-cascade-template="tenant-rooms">
                             <option value="">Pilih unit</option>
                             <?php foreach ($rooms as $room): ?>
-                                <option value="<?= (int) $room['id']; ?>" <?= (int) $modalRow['room_id'] === (int) $room['id'] ? 'selected' : ''; ?>>
+                                <option value="<?= (int) $room['id']; ?>" data-property-id="<?= (int) $room['property_id']; ?>" data-type-id="<?= (int) $room['room_type_id']; ?>" <?= (int) $modalRow['room_id'] === (int) $room['id'] ? 'selected' : ''; ?>>
                                     <?= html_escape($room['property_code'] . ' - ' . $room['room_label'] . ' (' . $room['room_code'] . ' / ' . $room['type_name'] . ')'); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -210,6 +250,6 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20260911-cascade'); ?>"></script>
 </body>
 </html>

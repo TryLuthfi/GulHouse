@@ -22,6 +22,7 @@
             <a href="<?= base_url('room-types'); ?>">Tipe Kamar</a>
             <a href="<?= base_url('rooms'); ?>">Kamar</a>
             <a href="<?= base_url('tenants'); ?>">Penghuni</a>
+            <a href="<?= base_url('payments'); ?>">Pembayaran</a>
             <a href="<?= base_url('photos'); ?>">Foto</a>
             <a href="#">Booking</a>
         </nav>
@@ -53,8 +54,27 @@
                 <strong><?= number_format((int) $summary['available'], 0, ',', '.'); ?></strong>
             </article>
             <article>
+                <span>Payment <?= html_escape($summary['payment_period']); ?></span>
+                <strong>Rp <?= number_format((int) $summary['payment_revenue'], 0, ',', '.'); ?></strong>
+            </article>
+        </section>
+
+        <section class="metric-grid compact">
+            <article>
                 <span>Booking Baru</span>
                 <strong><?= number_format((int) $summary['bookings'], 0, ',', '.'); ?></strong>
+            </article>
+            <article>
+                <span>Transaksi Payment</span>
+                <strong><?= number_format((int) $summary['payment_count'], 0, ',', '.'); ?></strong>
+            </article>
+            <article>
+                <span>Bill Belum Lunas</span>
+                <strong><?= number_format((int) $summary['unpaid_bills'], 0, ',', '.'); ?></strong>
+            </article>
+            <article>
+                <span>Potensi Bulanan</span>
+                <strong>Rp <?= number_format((int) $summary['monthly_potential'], 0, ',', '.'); ?></strong>
             </article>
         </section>
 
@@ -77,6 +97,29 @@
                     </div>
                 </div>
                 <canvas id="roomStatusChart" height="120"></canvas>
+            </article>
+        </section>
+
+        <section class="chart-grid">
+            <article class="panel chart-panel">
+                <div class="panel-head">
+                    <div>
+                        <p>Payment</p>
+                        <h2>Revenue Real Per Periode</h2>
+                    </div>
+                    <a class="mini-link" href="<?= base_url('payments'); ?>">Buka Master</a>
+                </div>
+                <canvas id="paymentByPeriodChart" height="120"></canvas>
+            </article>
+
+            <article class="panel chart-panel">
+                <div class="panel-head">
+                    <div>
+                        <p>Payment</p>
+                        <h2>Status Bill Terbaru</h2>
+                    </div>
+                </div>
+                <canvas id="billStatusChart" height="120"></canvas>
             </article>
         </section>
 
@@ -151,6 +194,43 @@
                     <?php endforeach; ?>
                 </div>
             </article>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <div>
+                    <p>Payment</p>
+                    <h2>Transaksi Terbaru</h2>
+                </div>
+                <a class="mini-link" href="<?= base_url('payments'); ?>">Kelola Payment</a>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tanggal</th>
+                            <th>Periode</th>
+                            <th>Kamar</th>
+                            <th>Penghuni</th>
+                            <th>Nilai</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($payment_rows as $row): ?>
+                            <tr>
+                                <td><?= html_escape($row['payment_date'] ?: $row['payment_date_text'] ?: '-'); ?></td>
+                                <td><?= html_escape($row['period_label']); ?></td>
+                                <td><strong><?= html_escape($row['room_label']); ?></strong><span><?= html_escape($row['property_code']); ?></span></td>
+                                <td><?= html_escape($row['tenant_name_snapshot'] ?: '-'); ?></td>
+                                <td>Rp <?= number_format((int) $row['amount'], 0, ',', '.'); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php if ( ! $payment_rows): ?>
+                            <tr><td colspan="5">Belum ada transaksi payment.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </section>
 
         <section class="panel">

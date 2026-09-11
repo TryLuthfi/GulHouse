@@ -1,0 +1,81 @@
+CREATE TABLE IF NOT EXISTS `gh_billing_periods` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `period_key` CHAR(7) NOT NULL,
+  `period_label` VARCHAR(40) NOT NULL,
+  `period_month` TINYINT UNSIGNED NOT NULL,
+  `period_year` SMALLINT UNSIGNED NOT NULL,
+  `source_file` VARCHAR(255) DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_period_key` (`period_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `gh_room_bills` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `period_id` INT UNSIGNED NOT NULL,
+  `room_id` INT UNSIGNED NOT NULL,
+  `tenant_id` INT UNSIGNED DEFAULT NULL,
+  `tenant_name_snapshot` VARCHAR(150) DEFAULT NULL,
+  `tenant_phone_snapshot` VARCHAR(32) DEFAULT NULL,
+  `base_price` BIGINT UNSIGNED DEFAULT NULL,
+  `deposit_amount` BIGINT UNSIGNED DEFAULT NULL,
+  `due_date` DATE DEFAULT NULL,
+  `due_date_text` VARCHAR(40) DEFAULT NULL,
+  `paid_total` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `late_days_text` VARCHAR(40) DEFAULT NULL,
+  `past_due_amount` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `future_due_amount` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `vacant_amount` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `bill_status` ENUM('empty','unpaid','partial','paid','overpaid','internal','reserved','unknown') NOT NULL DEFAULT 'unknown',
+  `source_sheet` VARCHAR(80) NOT NULL DEFAULT 'DATABASE',
+  `source_row` INT UNSIGNED DEFAULT NULL,
+  `source_period` VARCHAR(40) DEFAULT NULL,
+  `notes` TEXT DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_period_room` (`period_id`, `room_id`),
+  KEY `idx_room_period` (`room_id`, `period_id`),
+  KEY `idx_tenant_period` (`tenant_id`, `period_id`),
+  KEY `idx_bill_status` (`bill_status`),
+  CONSTRAINT `fk_gh_bill_period` FOREIGN KEY (`period_id`) REFERENCES `gh_billing_periods` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_gh_bill_room` FOREIGN KEY (`room_id`) REFERENCES `gh_rooms` (`id`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_gh_bill_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `gh_tenants` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `gh_payments` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `room_bill_id` BIGINT UNSIGNED NOT NULL,
+  `payment_date` DATE DEFAULT NULL,
+  `payment_date_text` VARCHAR(40) DEFAULT NULL,
+  `amount` BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  `payment_type` ENUM('rent','deposit','other') NOT NULL DEFAULT 'rent',
+  `method` VARCHAR(40) DEFAULT NULL,
+  `reference_no` VARCHAR(100) DEFAULT NULL,
+  `source_key` VARCHAR(180) NOT NULL,
+  `notes` TEXT DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_source_key` (`source_key`),
+  KEY `idx_bill` (`room_bill_id`),
+  KEY `idx_payment_date` (`payment_date`),
+  CONSTRAINT `fk_gh_payment_bill` FOREIGN KEY (`room_bill_id`) REFERENCES `gh_room_bills` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `gh_payment_import_issues` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `source_file` VARCHAR(255) NOT NULL,
+  `source_sheet` VARCHAR(80) NOT NULL,
+  `source_row` INT UNSIGNED DEFAULT NULL,
+  `source_period` VARCHAR(40) DEFAULT NULL,
+  `room_label` VARCHAR(150) DEFAULT NULL,
+  `tenant_name` VARCHAR(150) DEFAULT NULL,
+  `issue_type` VARCHAR(80) NOT NULL,
+  `issue_message` TEXT NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_issue_type` (`issue_type`),
+  KEY `idx_source_period` (`source_period`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

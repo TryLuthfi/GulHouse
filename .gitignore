@@ -14,3 +14,9 @@
 /landing/application/logs/*
 !/landing/application/logs/index.html
 !/landing/application/logs/.gitkeep
+/master/application/cache/sessions/*
+!/master/application/cache/sessions/index.html
+!/master/application/cache/sessions/.gitkeep
+/master/application/logs/*
+!/master/application/logs/index.html
+!/master/application/logs/.gitkeep

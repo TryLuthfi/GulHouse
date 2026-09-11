@@ -240,6 +240,14 @@ a {
     grid-template-columns: repeat(4, 1fr);
 }
 
+.metric-grid.compact {
+    margin-top: 12px;
+}
+
+.metric-grid.compact strong {
+    font-size: 22px;
+}
+
 .panel-grid {
     grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr);
 }
@@ -348,7 +356,12 @@ th {
     grid-template-columns: repeat(4, 1fr);
 }
 
-.tenant-form .full {
+.payment-form {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.tenant-form .full,
+.payment-form .full {
     grid-column: 1 / -1;
 }
 
@@ -489,6 +502,22 @@ th {
 .badge.reserved {
     color: #7c5115;
     background: #fff5df;
+}
+
+.badge.paid {
+    color: #14523d;
+    background: #eaf7f0;
+}
+
+.badge.partial,
+.badge.unpaid {
+    color: #7c5115;
+    background: #fff5df;
+}
+
+.badge.overpaid {
+    color: #0f4d68;
+    background: #e8f6fb;
 }
 
 .badge.active {
@@ -648,6 +677,10 @@ th {
     border-radius: 999px;
     font-weight: 900;
     cursor: pointer;
+}
+
+.payment-filter-form {
+    grid-template-columns: repeat(6, minmax(124px, 1fr)) auto;
 }
 
 .room-batch-upload {
@@ -960,6 +993,7 @@ th {
 
     .room-form,
     .tenant-form,
+    .payment-form,
     .filter-form,
     .photo-upload-form,
     .room-upload-row {
@@ -974,6 +1008,7 @@ th {
     .manage-grid,
     .room-form,
     .tenant-form,
+    .payment-form,
     .filter-form,
     .photo-upload-form,
     .room-upload-row {

@@ -19,6 +19,7 @@ class Dashboard extends CI_Controller
             'property_rows' => $this->Dashboard_model->get_property_rows(),
             'room_type_rows' => $this->Dashboard_model->get_room_type_rows(),
             'booking_rows' => $this->Dashboard_model->get_recent_bookings(),
+            'payment_rows' => $this->Dashboard_model->get_latest_payment_rows(),
             'charts' => $this->Dashboard_model->get_charts(),
         );
 

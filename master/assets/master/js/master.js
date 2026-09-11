@@ -174,7 +174,148 @@
 
         makeBar('revenueByPropertyChart', charts.revenue_by_property, false);
         makeBar('revenueByTypeChart', charts.revenue_by_type, true);
+        makeBar('paymentByPeriodChart', charts.payment_by_period, false);
         makeDoughnut('roomStatusChart', charts.rooms_by_status);
+        makeDoughnut('billStatusChart', charts.bill_status_by_latest_period);
+    }
+
+    var cascadeOptionTemplates = {};
+
+    function getCascadeOptions(select) {
+        var key = select.getAttribute('data-cascade-template') || '';
+        if (key && cascadeOptionTemplates[key]) {
+            return cascadeOptionTemplates[key];
+        }
+
+        var options = Array.prototype.slice.call(select.options).map(function (option) {
+            return option.cloneNode(true);
+        });
+
+        if (key) {
+            cascadeOptionTemplates[key] = options;
+        }
+
+        return options;
+    }
+
+    function hasOptionValue(select, value) {
+        return Array.prototype.some.call(select.options, function (option) {
+            return option.value === value;
+        });
+    }
+
+    function setCascadeOptions(select, options, predicate, preferredValue) {
+        select.innerHTML = '';
+        options.forEach(function (option) {
+            if (predicate(option)) {
+                select.appendChild(option.cloneNode(true));
+            }
+        });
+
+        select.value = preferredValue && hasOptionValue(select, preferredValue) ? preferredValue : '';
+    }
+
+    function csvIncludes(value, needle) {
+        if (!needle) {
+            return true;
+        }
+
+        return (value || '').split(',').indexOf(needle) !== -1;
+    }
+
+    function initPhotoCascadeScope(scope) {
+        var propertySelect = scope.querySelector('[data-photo-property]');
+        var typeSelect = scope.querySelector('[data-photo-type]');
+
+        if (!propertySelect || !typeSelect || scope.getAttribute('data-photo-cascade-ready') === 'true') {
+            return;
+        }
+
+        var typeOptions = getCascadeOptions(typeSelect);
+
+        function sync(keepType) {
+            var propertyCode = propertySelect.value;
+            var typeValue = keepType ? typeSelect.value : '';
+            setCascadeOptions(typeSelect, typeOptions, function (option) {
+                return !option.value || csvIncludes(option.getAttribute('data-property-codes'), propertyCode);
+            }, typeValue);
+        }
+
+        propertySelect.addEventListener('change', function () {
+            sync(false);
+        });
+
+        scope.setAttribute('data-photo-cascade-ready', 'true');
+        sync(true);
+    }
+
+    function initPhotoCascadingFilters() {
+        document.querySelectorAll('[data-photo-cascade-form], [data-room-upload-row]').forEach(initPhotoCascadeScope);
+    }
+
+    function initTenantCascadingFilters() {
+        document.querySelectorAll('[data-tenant-cascade-form]').forEach(function (form) {
+            var propertySelect = form.querySelector('[data-tenant-property-filter]');
+            var typeSelect = form.querySelector('[data-tenant-type-filter]');
+            var roomSelect = form.querySelector('[data-tenant-room-select]');
+
+            if (!propertySelect || !typeSelect || !roomSelect || form.getAttribute('data-tenant-cascade-ready') === 'true') {
+                return;
+            }
+
+            var typeOptions = getCascadeOptions(typeSelect);
+            var roomOptions = getCascadeOptions(roomSelect);
+
+            function typeMatches(option, propertyId) {
+                return !option.value || csvIncludes(option.getAttribute('data-property-ids'), propertyId);
+            }
+
+            function roomMatches(option, propertyId, typeId) {
+                if (!option.value) {
+                    return true;
+                }
+
+                return (!propertyId || option.getAttribute('data-property-id') === propertyId)
+                    && (!typeId || option.getAttribute('data-type-id') === typeId);
+            }
+
+            function sync(keepType, keepRoom) {
+                var propertyId = propertySelect.value;
+                var typeValue = keepType ? typeSelect.value : '';
+                var roomValue = keepRoom ? roomSelect.value : '';
+
+                setCascadeOptions(typeSelect, typeOptions, function (option) {
+                    return typeMatches(option, propertyId);
+                }, typeValue);
+
+                setCascadeOptions(roomSelect, roomOptions, function (option) {
+                    return roomMatches(option, propertyId, typeSelect.value);
+                }, roomValue);
+            }
+
+            propertySelect.addEventListener('change', function () {
+                sync(false, false);
+            });
+
+            typeSelect.addEventListener('change', function () {
+                sync(true, false);
+            });
+
+            roomSelect.addEventListener('change', function () {
+                var selected = roomSelect.options[roomSelect.selectedIndex];
+                if (!selected || !selected.value) {
+                    return;
+                }
+
+                propertySelect.value = selected.getAttribute('data-property-id') || '';
+                sync(true, true);
+                typeSelect.value = selected.getAttribute('data-type-id') || '';
+                sync(true, true);
+            });
+
+            form.setAttribute('data-tenant-cascade-ready', 'true');
+            sync(true, true);
+        });
     }
 
     function initRoomUploadRows() {
@@ -212,6 +353,7 @@
         addButton.addEventListener('click', function () {
             var firstRow = rows.querySelector('[data-room-upload-row]');
             var nextRow = firstRow.cloneNode(true);
+            nextRow.removeAttribute('data-photo-cascade-ready');
 
             nextRow.querySelectorAll('select').forEach(function (select) {
                 select.selectedIndex = 0;
@@ -223,6 +365,7 @@
 
             rows.appendChild(nextRow);
             refreshRows();
+            initPhotoCascadeScope(nextRow);
         });
 
         rows.addEventListener('click', function (event) {
@@ -238,6 +381,85 @@
         });
 
         refreshRows();
+    }
+
+    function initPaymentCascadingFilters() {
+        var form = document.querySelector('[data-payment-cascade-form]');
+        var propertySelect = form ? form.querySelector('[data-cascade-property]') : null;
+        var typeSelect = form ? form.querySelector('[data-cascade-type]') : null;
+        var roomSelect = form ? form.querySelector('[data-cascade-room]') : null;
+
+        if (!form || !propertySelect || !typeSelect || !roomSelect) {
+            return;
+        }
+
+        var typeOptions = Array.prototype.slice.call(typeSelect.options).map(function (option) {
+            return option.cloneNode(true);
+        });
+        var roomOptions = Array.prototype.slice.call(roomSelect.options).map(function (option) {
+            return option.cloneNode(true);
+        });
+
+        function restoreOptions(select, options, predicate, preferredValue) {
+            select.innerHTML = '';
+            options.forEach(function (option) {
+                if (predicate(option)) {
+                    select.appendChild(option.cloneNode(true));
+                }
+            });
+
+            var hasPreferred = Array.prototype.some.call(select.options, function (option) {
+                return option.value === preferredValue;
+            });
+
+            if (preferredValue && hasPreferred) {
+                select.value = preferredValue;
+            } else {
+                select.value = '';
+            }
+        }
+
+        function optionHasProperty(option, propertyId) {
+            if (!option.value || !propertyId) {
+                return true;
+            }
+
+            var ids = (option.getAttribute('data-property-ids') || '').split(',');
+            return ids.indexOf(propertyId) !== -1;
+        }
+
+        function roomMatches(option, propertyId, typeId) {
+            if (!option.value) {
+                return true;
+            }
+
+            return (!propertyId || option.getAttribute('data-property-id') === propertyId)
+                && (!typeId || option.getAttribute('data-type-id') === typeId);
+        }
+
+        function syncFilters(keepType, keepRoom) {
+            var propertyId = propertySelect.value;
+            var typeValue = keepType ? typeSelect.value : '';
+            var roomValue = keepRoom ? roomSelect.value : '';
+
+            restoreOptions(typeSelect, typeOptions, function (option) {
+                return optionHasProperty(option, propertyId);
+            }, typeValue);
+
+            restoreOptions(roomSelect, roomOptions, function (option) {
+                return roomMatches(option, propertyId, typeSelect.value);
+            }, roomValue);
+        }
+
+        propertySelect.addEventListener('change', function () {
+            syncFilters(false, false);
+        });
+
+        typeSelect.addEventListener('change', function () {
+            syncFilters(true, false);
+        });
+
+        syncFilters(true, true);
     }
 
     function initPhotoPreview() {
@@ -536,5 +758,8 @@
     initConfirmDelete();
     initCharts();
     initRoomUploadRows();
+    initPaymentCascadingFilters();
+    initPhotoCascadingFilters();
+    initTenantCascadingFilters();
     initPhotoPreview();
 }());

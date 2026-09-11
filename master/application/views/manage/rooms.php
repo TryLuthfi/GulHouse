@@ -19,6 +19,7 @@
             <a href="<?= base_url('room-types'); ?>">Tipe Kamar</a>
             <a class="is-active" href="<?= base_url('rooms'); ?>">Kamar</a>
             <a href="<?= base_url('tenants'); ?>">Penghuni</a>
+            <a href="<?= base_url('payments'); ?>">Pembayaran</a>
             <a href="<?= base_url('photos'); ?>">Foto</a>
             <a href="#">Booking</a>
         </nav>
