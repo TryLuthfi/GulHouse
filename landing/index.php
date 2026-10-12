@@ -1,4 +1,73 @@
 <?php
+if (isset($_SERVER['REQUEST_URI']))
+{
+	$masterUriPath = parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_PATH);
+	$masterUriPath = $masterUriPath === false ? '' : '/' . ltrim($masterUriPath, '/');
+
+	if ($masterUriPath === '/master')
+	{
+		$queryString = isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== '' ? '?' . $_SERVER['QUERY_STRING'] : '';
+		header('Location: /master/' . $queryString, true, 301);
+		exit;
+	}
+
+	if (strpos($masterUriPath, '/master/') === 0)
+	{
+		$masterRoot = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'master');
+
+		if ($masterRoot !== false && strpos($masterUriPath, '/master/assets/') === 0)
+		{
+			$assetRelativePath = str_replace('/', DIRECTORY_SEPARATOR, substr($masterUriPath, strlen('/master/assets/')));
+			$assetPath = realpath($masterRoot . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . $assetRelativePath);
+			$assetsRoot = realpath($masterRoot . DIRECTORY_SEPARATOR . 'assets');
+
+			if ($assetPath !== false && $assetsRoot !== false && strpos($assetPath, $assetsRoot . DIRECTORY_SEPARATOR) === 0 && is_file($assetPath))
+			{
+				$extension = strtolower(pathinfo($assetPath, PATHINFO_EXTENSION));
+				$mimeTypes = array(
+					'css' => 'text/css; charset=UTF-8',
+					'js' => 'application/javascript; charset=UTF-8',
+					'png' => 'image/png',
+					'jpg' => 'image/jpeg',
+					'jpeg' => 'image/jpeg',
+					'gif' => 'image/gif',
+					'svg' => 'image/svg+xml',
+					'webp' => 'image/webp',
+					'woff' => 'font/woff',
+					'woff2' => 'font/woff2',
+					'ttf' => 'font/ttf',
+					'eot' => 'application/vnd.ms-fontobject',
+				);
+
+				if (isset($mimeTypes[$extension]))
+				{
+					header('Content-Type: ' . $mimeTypes[$extension]);
+				}
+
+				header('Content-Length: ' . filesize($assetPath));
+				header('Cache-Control: public, max-age=2592000');
+				readfile($assetPath);
+				exit;
+			}
+
+			http_response_code(404);
+			exit;
+		}
+
+		if ($masterRoot !== false && is_file($masterRoot . DIRECTORY_SEPARATOR . 'index.php'))
+		{
+			chdir($masterRoot);
+			$_SERVER['SCRIPT_NAME'] = '/master/index.php';
+			$_SERVER['PHP_SELF'] = '/master/index.php';
+			$_SERVER['SCRIPT_FILENAME'] = $masterRoot . DIRECTORY_SEPARATOR . 'index.php';
+			$_SERVER['DOCUMENT_ROOT'] = dirname($masterRoot);
+
+			require $masterRoot . DIRECTORY_SEPARATOR . 'index.php';
+			exit;
+		}
+	}
+}
+
 /**
  * CodeIgniter
  *
