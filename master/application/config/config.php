@@ -389,11 +389,17 @@ $config['encryption_key'] = 'gulhouse_landing_change_this_key_on_production';
 |
 */
 $config['sess_driver'] = 'files';
-$config['sess_cookie_name'] = 'ci_session';
+$config['sess_cookie_name'] = 'gh_master_session';
 $config['sess_expiration'] = 7200;
 $sessionPath = APPPATH . 'cache/sessions';
 if (!is_dir($sessionPath)) {
     @mkdir($sessionPath, 0755, true);
+}
+if (!is_dir($sessionPath) || !is_writable($sessionPath)) {
+    $sessionPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'gulhouse_master_sessions';
+    if (!is_dir($sessionPath)) {
+        @mkdir($sessionPath, 0755, true);
+    }
 }
 $config['sess_save_path'] = $sessionPath;
 $config['sess_match_ip'] = FALSE;
@@ -415,11 +421,11 @@ $config['sess_regenerate_destroy'] = FALSE;
 |       'cookie_httponly') will also affect sessions.
 |
 */
-$config['cookie_prefix']    = 'gh_landing_';
+$config['cookie_prefix']    = 'gh_master_';
 $config['cookie_domain']    = '';
-$config['cookie_path']        = '/';
+$config['cookie_path']        = '/master/';
 $config['cookie_secure']    = FALSE;
-$config['cookie_httponly']     = FALSE;
+$config['cookie_httponly']     = TRUE;
 
 /*
 |--------------------------------------------------------------------------
