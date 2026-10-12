@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= base_url('assets/landing/vendor/leaflet/leaflet.css?v=1.9.4'); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20260909-logo'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20260912-payment'); ?>">
 </head>
 <body>
     <header class="site-header" id="top">
@@ -36,6 +36,7 @@
             <a href="#costs">Biaya</a>
             <a href="#location">Lokasi</a>
             <a href="#booking">Booking</a>
+            <a href="<?= base_url('payment'); ?>" data-payment-open>Payment</a>
             <a href="#contact">Kontak</a>
         </nav>
         <a class="header-action" href="#booking">Cek Kamar</a>
@@ -282,25 +283,15 @@
             <div class="section-copy reveal">
                 <p class="eyebrow">Preview foto</p>
                 <h2>Nuansa kamar, area santai, dan living space.</h2>
-                <p>Bagian ini disiapkan untuk galeri foto asli GUL HOUSE. Untuk sekarang tampilannya memakai preview visual agar flow UI-nya sudah kebaca dari awal.</p>
+                <p>Foto di bagian ini mengikuti data master foto. Placeholder sementara bisa diganti kapan saja dari halaman master.</p>
             </div>
             <div class="preview-mosaic reveal delay-1">
-                <figure class="preview-large">
-                    <img src="https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=980&q=74" alt="Preview kamar GUL HOUSE" loading="lazy" decoding="async">
-                    <figcaption>Kamar siap huni</figcaption>
-                </figure>
-                <figure>
-                    <img src="https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=620&q=74" alt="Preview ruang tidur GUL HOUSE" loading="lazy" decoding="async">
-                    <figcaption>Ruang tidur</figcaption>
-                </figure>
-                <figure>
-                    <img src="https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=620&q=74" alt="Preview fasilitas GUL HOUSE" loading="lazy" decoding="async">
-                    <figcaption>Fasilitas kamar</figcaption>
-                </figure>
-                <figure>
-                    <img src="https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=620&q=74" alt="Preview area bersama GUL HOUSE" loading="lazy" decoding="async">
-                    <figcaption>Area bersama</figcaption>
-                </figure>
+                <?php foreach ($preview_photos as $index => $photo): ?>
+                    <figure class="<?= $index === 0 ? 'preview-large' : ''; ?>">
+                        <img src="<?= html_escape($photo['src']); ?>" alt="<?= html_escape($photo['title']); ?>" loading="lazy" decoding="async">
+                        <figcaption><?= html_escape($photo['category']); ?></figcaption>
+                    </figure>
+                <?php endforeach; ?>
             </div>
         </section>
 
@@ -561,8 +552,28 @@
     <div class="sticky-cta">
         <a href="https://wa.me/6280000000000" target="_blank" rel="noopener">WhatsApp</a>
         <a href="#booking">Booking</a>
+        <a href="<?= base_url('payment'); ?>" data-payment-open>Payment</a>
+    </div>
+    <div class="payment-modal" data-payment-modal aria-hidden="true">
+        <div class="payment-modal-backdrop" data-payment-close></div>
+        <section class="payment-modal-card" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
+            <button type="button" class="payment-modal-close" data-payment-close aria-label="Tutup modal payment">&times;</button>
+            <p class="eyebrow">Payment</p>
+            <h2 id="payment-modal-title">Cek tagihan penghuni.</h2>
+            <p>Masukkan nomor HP yang terdaftar dan 4 digit akhir NIK. Setelah cocok, halaman status pembayaran akan terbuka.</p>
+            <form class="payment-check-form" method="post" action="<?= base_url('payment/check'); ?>">
+                <label>No. HP Penghuni
+                    <input type="tel" name="phone" required inputmode="tel" autocomplete="tel" placeholder="08xxxxxxxxxx">
+                </label>
+                <label>4 Digit Akhir NIK
+                    <input type="password" name="nik_last4" required inputmode="numeric" maxlength="4" pattern="[0-9]{4}" autocomplete="off" placeholder="1234">
+                </label>
+                <button type="submit" class="glow-button">Cek Pembayaran</button>
+            </form>
+            <a class="payment-modal-link" href="<?= base_url('payment'); ?>">Buka halaman payment</a>
+        </section>
     </div>
     <script defer src="<?= base_url('assets/landing/vendor/leaflet/leaflet.js?v=1.9.4'); ?>"></script>
-    <script defer src="<?= base_url('assets/landing/js/landing.js?v=20260909-logo'); ?>"></script>
+    <script defer src="<?= base_url('assets/landing/js/landing.js?v=20260912-payment'); ?>"></script>
 </body>
 </html>

@@ -773,6 +773,53 @@
         setActive(tabs[0].getAttribute('data-map-tab'));
     }
 
+    function initPaymentModal() {
+        var modal = document.querySelector('[data-payment-modal]');
+        var triggers = Array.prototype.slice.call(document.querySelectorAll('[data-payment-open]'));
+
+        if (!modal || !triggers.length) {
+            return;
+        }
+
+        var firstInput = modal.querySelector('input[name="phone"]');
+
+        function openModal(event) {
+            if (event) {
+                event.preventDefault();
+            }
+
+            modal.classList.add('is-open');
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+
+            window.setTimeout(function () {
+                if (firstInput) {
+                    firstInput.focus();
+                }
+            }, 80);
+        }
+
+        function closeModal() {
+            modal.classList.remove('is-open');
+            modal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+        }
+
+        triggers.forEach(function (trigger) {
+            trigger.addEventListener('click', openModal);
+        });
+
+        modal.querySelectorAll('[data-payment-close]').forEach(function (button) {
+            button.addEventListener('click', closeModal);
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+                closeModal();
+            }
+        });
+    }
+
     setHeaderState();
     window.addEventListener('scroll', setHeaderState, { passive: true });
     initPageProgress();
@@ -788,4 +835,5 @@
     initPhotoModal();
     initRoomFilter();
     initMapSwitcher();
+    initPaymentModal();
 }());

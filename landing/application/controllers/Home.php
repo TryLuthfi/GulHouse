@@ -24,6 +24,7 @@ class Home extends CI_Controller
             'house_rules' => $this->Landing_model->get_house_rules(),
             'nearby_places' => $this->Landing_model->get_nearby_places(),
             'hero_slides' => $this->get_slider_images(),
+            'preview_photos' => $this->Landing_model->get_preview_photos(4),
         );
 
         $this->load->view('landing_home', $data);
@@ -115,6 +116,79 @@ class Home extends CI_Controller
             : 'Permintaan belum tersimpan ke database, silakan hubungi WhatsApp GUL HOUSE.');
 
         redirect(base_url('#booking'));
+    }
+
+    public function payment()
+    {
+        if ($this->session->userdata('gh_payment_access')) {
+            redirect(base_url('payment/status'));
+            return;
+        }
+
+        $data = array(
+            'title' => 'Cek Pembayaran | GUL HOUSE',
+        );
+
+        $this->load->view('payment_lookup', $data);
+    }
+
+    public function payment_check()
+    {
+        $phone = trim((string) $this->input->post('phone', TRUE));
+        $nikLast4 = trim((string) $this->input->post('nik_last4', TRUE));
+        $access = $this->Landing_model->find_tenant_payment_access($phone, $nikLast4);
+
+        if ( ! $access) {
+            $this->session->unset_userdata('gh_payment_access');
+            $this->session->set_flashdata('payment_warning', 'Data belum cocok. Pastikan nomor HP aktif penghuni dan 4 digit akhir NIK benar.');
+            redirect(base_url('payment'));
+            return;
+        }
+
+        $this->session->set_userdata('gh_payment_access', array(
+            'tenant_id' => (int) $access['tenant_id'],
+            'stay_id' => (int) $access['stay_id'],
+            'verified_at' => date('Y-m-d H:i:s'),
+        ));
+
+        redirect(base_url('payment/status'));
+    }
+
+    public function payment_status()
+    {
+        $access = $this->session->userdata('gh_payment_access');
+
+        if ( ! is_array($access) || empty($access['tenant_id']) || empty($access['stay_id'])) {
+            redirect(base_url('payment'));
+            return;
+        }
+
+        $context = $this->Landing_model->get_payment_context((int) $access['tenant_id'], (int) $access['stay_id']);
+
+        if ( ! $context) {
+            $this->session->unset_userdata('gh_payment_access');
+            $this->session->set_flashdata('payment_warning', 'Sesi pembayaran tidak valid lagi. Silakan cek ulang.');
+            redirect(base_url('payment'));
+            return;
+        }
+
+        $currentBill = $this->Landing_model->get_current_payment_bill($context);
+
+        $data = array(
+            'title' => 'Status Pembayaran | GUL HOUSE',
+            'context' => $context,
+            'current_bill' => $currentBill,
+            'bill_history' => $this->Landing_model->get_payment_bill_history($context, 8),
+            'payments' => ! empty($currentBill['id']) ? $this->Landing_model->get_bill_payments((int) $currentBill['id']) : array(),
+        );
+
+        $this->load->view('payment_status', $data);
+    }
+
+    public function payment_logout()
+    {
+        $this->session->unset_userdata('gh_payment_access');
+        redirect(base_url('payment'));
     }
 
     public function room($slug = null)

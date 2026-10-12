@@ -1,4 +1,45 @@
 <?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
+<?php
+    $totalTypes = count($rows);
+    $activeTypes = 0;
+    $usedTypes = 0;
+    $totalRooms = 0;
+    foreach ($rows as $typeRow) {
+        if ((int) $typeRow['is_active'] === 1) {
+            $activeTypes++;
+        }
+        if ((int) $typeRow['room_count'] > 0) {
+            $usedTypes++;
+        }
+        $totalRooms += (int) $typeRow['room_count'];
+    }
+    $metricUrl = function (array $set = array()) use ($filters) {
+        $params = $filters;
+        $active = ! empty($set);
+        foreach ($set as $key => $value) {
+            if (! isset($filters[$key]) || (string) $filters[$key] !== (string) $value) {
+                $active = FALSE;
+                break;
+            }
+        }
+
+        if ($active) {
+            foreach (array_keys($set) as $key) {
+                unset($params[$key]);
+            }
+        } else {
+            foreach ($set as $key => $value) {
+                $params[$key] = $value;
+            }
+        }
+
+        $params = array_filter($params, function ($value) {
+            return $value !== '' && $value !== null;
+        });
+
+        return base_url('room-types' . ($params ? '?' . http_build_query($params) : ''));
+    };
+?>
 <!doctype html>
 <html lang="id">
 <head>
@@ -8,7 +49,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261001-partial-metric'); ?>">
 </head>
 <body>
     <aside class="sidebar">
@@ -34,38 +75,72 @@
         <?php if ($this->session->flashdata('success')): ?><div class="notice success"><?= html_escape($this->session->flashdata('success')); ?></div><?php endif; ?>
         <?php if ($this->session->flashdata('error')): ?><div class="notice error"><?= html_escape($this->session->flashdata('error')); ?></div><?php endif; ?>
 
-        <section class="manage-grid">
-            <article class="panel">
-                <div class="panel-head">
-                    <div><p>Tambah</p><h2>Tipe Baru</h2></div>
-                    <button type="button" class="mini-link" data-open-modal="#type-create-modal">Tambah Tipe</button>
-                </div>
-                <p class="panel-copy">Kelola kategori kamar seperti Standart, Deluxe, VIP, Studio, 1BR, atau 2BR.</p>
-            </article>
+        <section class="metric-grid room-type-summary-grid">
+            <a class="metric-card" href="<?= base_url('room-types'); ?>"><span>Total Tipe</span><strong><?= number_format($totalTypes, 0, ',', '.'); ?></strong></a>
+            <a class="metric-card <?= $filters['status'] === 'active' ? 'is-active' : ''; ?>" href="<?= $metricUrl(array('status' => 'active')); ?>"><span>Tipe Aktif</span><strong><?= number_format($activeTypes, 0, ',', '.'); ?></strong></a>
+            <a class="metric-card <?= isset($filters['usage']) && $filters['usage'] === 'used' ? 'is-active' : ''; ?>" href="<?= $metricUrl(array('usage' => 'used')); ?>"><span>Tipe Terpakai</span><strong><?= number_format($usedTypes, 0, ',', '.'); ?></strong></a>
+            <a class="metric-card" href="<?= base_url('room-types'); ?>"><span>Total Kamar</span><strong><?= number_format($totalRooms, 0, ',', '.'); ?></strong></a>
+        </section>
 
-            <article class="panel">
-                <div class="panel-head"><div><p>Data</p><h2>Daftar Tipe</h2></div></div>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Nama</th><th>Deskripsi</th><th>Status</th><th>Aksi</th></tr></thead>
-                        <tbody>
-                            <?php foreach ($rows as $row): ?>
-                                <tr>
-                                    <td><strong><?= html_escape($row['name']); ?></strong></td>
-                                    <td><?= html_escape($row['description'] ? $row['description'] : '-'); ?></td>
-                                    <td><span class="badge <?= (int) $row['is_active'] ? 'good' : 'muted'; ?>"><?= (int) $row['is_active'] ? 'Aktif' : 'Nonaktif'; ?></span></td>
-                                    <td>
-                                        <div class="table-actions">
-                                            <button type="button" class="table-action" data-open-modal="#type-edit-<?= (int) $row['id']; ?>">Edit</button>
-                                            <button type="button" class="table-action danger" data-delete-url="<?= base_url('room-types/delete/' . (int) $row['id']); ?>" data-delete-label="<?= html_escape($row['name']); ?>">Hapus</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </article>
+        <section class="panel room-type-table-panel">
+            <div class="panel-head">
+                <div><p>Data</p><h2>Daftar Tipe</h2></div>
+                <button type="button" class="mini-link" data-open-modal="#type-create-modal">Tambah Tipe</button>
+            </div>
+            <form class="filter-form master-filter-form" method="get" action="<?= base_url('room-types'); ?>">
+                <?php if (! empty($filters['usage'])): ?><input type="hidden" name="usage" value="<?= html_escape($filters['usage']); ?>"><?php endif; ?>
+                <label>Jenis Properti
+                    <select name="property_type">
+                        <option value="">Semua jenis</option>
+                        <?php foreach (array('house' => 'House', 'apartment' => 'Apartment', 'other' => 'Other') as $value => $label): ?>
+                            <option value="<?= $value; ?>" <?= $filters['property_type'] === $value ? 'selected' : ''; ?>><?= $label; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label>Status
+                    <select name="status">
+                        <option value="">Semua status</option>
+                        <option value="active" <?= $filters['status'] === 'active' ? 'selected' : ''; ?>>Aktif</option>
+                        <option value="inactive" <?= $filters['status'] === 'inactive' ? 'selected' : ''; ?>>Nonaktif</option>
+                    </select>
+                </label>
+                <label>Cari
+                    <input type="search" name="q" value="<?= html_escape($filters['q']); ?>" placeholder="Tipe, deskripsi, properti">
+                </label>
+                <button type="submit">Tampilkan</button>
+                <a class="mini-link" href="<?= base_url('room-types'); ?>">Reset</a>
+            </form>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Nama</th><th>Jenis Properti</th><th>Properti</th><th>Total Kamar</th><th>Deskripsi</th><th>Status</th><th>Aksi</th></tr></thead>
+                    <tbody>
+                        <?php foreach ($rows as $row): ?>
+                            <?php
+                                $propertyTypes = $row['property_types'] ? explode(', ', $row['property_types']) : array();
+                                $propertyTypeLabels = array();
+                                foreach ($propertyTypes as $propertyType) {
+                                    $propertyTypeLabels[] = ucfirst($propertyType);
+                                }
+                            ?>
+                            <tr>
+                                <td><strong><?= html_escape($row['name']); ?></strong></td>
+                                <td><?= $propertyTypeLabels ? html_escape(implode(', ', $propertyTypeLabels)) : '-'; ?></td>
+                                <td><span><?= html_escape($row['property_codes'] ? $row['property_codes'] : '-'); ?></span></td>
+                                <td><?= number_format((int) $row['room_count'], 0, ',', '.'); ?></td>
+                                <td><?= html_escape($row['description'] ? $row['description'] : '-'); ?></td>
+                                <td><span class="badge <?= (int) $row['is_active'] ? 'good' : 'muted'; ?>"><?= (int) $row['is_active'] ? 'Aktif' : 'Nonaktif'; ?></span></td>
+                                <td>
+                                    <div class="table-actions">
+                                        <button type="button" class="table-action" data-open-modal="#type-edit-<?= (int) $row['id']; ?>">Edit</button>
+                                        <button type="button" class="table-action danger" data-delete-url="<?= base_url('room-types/delete/' . (int) $row['id']); ?>" data-delete-label="<?= html_escape($row['name']); ?>">Hapus</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php if ( ! $rows): ?><tr><td colspan="7">Belum ada tipe kamar.</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </section>
     </main>
 
@@ -73,12 +148,18 @@
         <div class="modal-backdrop" data-close-modal></div>
         <section class="modal-card">
             <div class="modal-head"><h2>Tambah Tipe</h2><button type="button" data-close-modal>x</button></div>
-            <form class="manage-form" method="post" action="<?= base_url('room-types/save'); ?>" data-confirm-submit>
+            <form class="manage-form sectioned" method="post" action="<?= base_url('room-types/save'); ?>" data-confirm-submit>
                 <input type="hidden" name="id" value="0">
-                <label>Nama Tipe<input type="text" name="name" required placeholder="Studio"></label>
-                <label>Deskripsi<textarea name="description" rows="5" placeholder="Deskripsi singkat tipe kamar"></textarea></label>
-                <label class="check-row"><input type="checkbox" name="is_active" value="1" checked> Aktif</label>
-                <button type="submit">Simpan Tipe</button>
+                <div class="form-section">
+                    <h3 class="form-section-title">Identitas Tipe</h3>
+                    <label>Nama Tipe<input type="text" name="name" required placeholder="Studio"></label>
+                    <label class="check-row"><input type="checkbox" name="is_active" value="1" checked> Aktif</label>
+                </div>
+                <div class="form-section">
+                    <h3 class="form-section-title">Deskripsi Landing</h3>
+                    <label class="full">Deskripsi<textarea name="description" rows="5" placeholder="Deskripsi singkat tipe kamar"></textarea></label>
+                </div>
+                <div class="form-actions"><button type="submit">Simpan Tipe</button></div>
             </form>
         </section>
     </div>
@@ -88,12 +169,18 @@
             <div class="modal-backdrop" data-close-modal></div>
             <section class="modal-card">
                 <div class="modal-head"><h2>Edit <?= html_escape($row['name']); ?></h2><button type="button" data-close-modal>x</button></div>
-                <form class="manage-form" method="post" action="<?= base_url('room-types/save'); ?>" data-confirm-submit>
+                <form class="manage-form sectioned" method="post" action="<?= base_url('room-types/save'); ?>" data-confirm-submit>
                     <input type="hidden" name="id" value="<?= (int) $row['id']; ?>">
-                    <label>Nama Tipe<input type="text" name="name" required value="<?= html_escape($row['name']); ?>"></label>
-                    <label>Deskripsi<textarea name="description" rows="5"><?= html_escape((string) $row['description']); ?></textarea></label>
-                    <label class="check-row"><input type="checkbox" name="is_active" value="1" <?= (int) $row['is_active'] === 1 ? 'checked' : ''; ?>> Aktif</label>
-                    <button type="submit">Simpan Perubahan</button>
+                    <div class="form-section">
+                        <h3 class="form-section-title">Identitas Tipe</h3>
+                        <label>Nama Tipe<input type="text" name="name" required value="<?= html_escape($row['name']); ?>"></label>
+                        <label class="check-row"><input type="checkbox" name="is_active" value="1" <?= (int) $row['is_active'] === 1 ? 'checked' : ''; ?>> Aktif</label>
+                    </div>
+                    <div class="form-section">
+                        <h3 class="form-section-title">Deskripsi Landing</h3>
+                        <label class="full">Deskripsi<textarea name="description" rows="5"><?= html_escape((string) $row['description']); ?></textarea></label>
+                    </div>
+                    <div class="form-actions"><button type="submit">Simpan Perubahan</button></div>
                 </form>
             </section>
         </div>
@@ -117,6 +204,6 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261001-partial-metric'); ?>"></script>
 </body>
 </html>

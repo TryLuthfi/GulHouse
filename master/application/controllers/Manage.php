@@ -13,10 +13,17 @@ class Manage extends CI_Controller
     public function properties()
     {
         $id = (int) $this->input->get('id');
+        $filters = array(
+            'type' => trim((string) $this->input->get('type', TRUE)),
+            'status' => trim((string) $this->input->get('status', TRUE)),
+            'q' => trim((string) $this->input->get('q', TRUE)),
+        );
+
         $this->load->view('manage/properties', array(
             'title' => 'Properti | GUL HOUSE',
             'admin_name' => $this->session->userdata('gh_admin_name'),
-            'rows' => $this->Master_model->get_properties(),
+            'rows' => $this->Master_model->get_properties($filters),
+            'filters' => $filters,
             'edit' => $id > 0 ? $this->Master_model->get_property($id) : null,
         ));
     }
@@ -47,10 +54,18 @@ class Manage extends CI_Controller
     public function room_types()
     {
         $id = (int) $this->input->get('id');
+        $filters = array(
+            'property_type' => trim((string) $this->input->get('property_type', TRUE)),
+            'status' => trim((string) $this->input->get('status', TRUE)),
+            'usage' => trim((string) $this->input->get('usage', TRUE)),
+            'q' => trim((string) $this->input->get('q', TRUE)),
+        );
+
         $this->load->view('manage/room_types', array(
             'title' => 'Tipe Kamar | GUL HOUSE',
             'admin_name' => $this->session->userdata('gh_admin_name'),
-            'rows' => $this->Master_model->get_room_types(),
+            'rows' => $this->Master_model->get_room_types($filters),
+            'filters' => $filters,
             'edit' => $id > 0 ? $this->Master_model->get_room_type($id) : null,
         ));
     }
@@ -79,12 +94,22 @@ class Manage extends CI_Controller
     public function rooms()
     {
         $id = (int) $this->input->get('id');
+        $filters = array(
+            'property_id' => (int) $this->input->get('property_id'),
+            'room_type_id' => (int) $this->input->get('room_type_id'),
+            'status' => trim((string) $this->input->get('status', TRUE)),
+            'public' => trim((string) $this->input->get('public', TRUE)),
+            'q' => trim((string) $this->input->get('q', TRUE)),
+        );
+
         $this->load->view('manage/rooms', array(
             'title' => 'Kamar | GUL HOUSE',
             'admin_name' => $this->session->userdata('gh_admin_name'),
-            'rows' => $this->Master_model->get_rooms(),
+            'rows' => $this->Master_model->get_rooms($filters),
+            'room_catalog' => $this->Master_model->get_rooms(),
             'properties' => $this->Master_model->get_active_properties(),
             'room_types' => $this->Master_model->get_active_room_types(),
+            'filters' => $filters,
             'edit' => $id > 0 ? $this->Master_model->get_room($id) : null,
         ));
     }
@@ -127,10 +152,27 @@ class Manage extends CI_Controller
     {
         $selectedProperty = strtoupper(trim((string) $this->input->get('property', TRUE)));
         $selectedType = trim((string) $this->input->get('type', TRUE));
+        $selectedCategory = trim((string) $this->input->get('category', TRUE));
         $properties = $this->Master_model->get_active_properties();
         $roomTypes = $this->Master_model->get_active_room_types();
+        $categories = $this->photo_categories();
         $selectedProperty = $this->resolve_photo_value($selectedProperty, $properties, 'code');
         $selectedType = $this->resolve_photo_value($selectedType, $roomTypes, 'name');
+        $roomPhotos = $this->list_room_photos($selectedProperty, $selectedType);
+        $selectedCategory = $this->resolve_photo_category($selectedCategory, $categories);
+        $categoryCounts = array('all' => count($roomPhotos));
+
+        foreach ($categories as $label) {
+            $categoryCounts[$label] = 0;
+        }
+
+        foreach ($roomPhotos as $photo) {
+            $label = isset($photo['category']) ? (string) $photo['category'] : 'Kamar';
+            if (! isset($categoryCounts[$label])) {
+                $categoryCounts[$label] = 0;
+            }
+            $categoryCounts[$label]++;
+        }
 
         $this->load->view('manage/photos', array(
             'title' => 'Foto | GUL HOUSE',
@@ -140,10 +182,12 @@ class Manage extends CI_Controller
             'room_catalog' => $this->Master_model->get_rooms_for_payment_filters(),
             'selected_property' => $selectedProperty,
             'selected_type' => $selectedType,
+            'selected_category' => $selectedCategory,
             'slider_photos' => $this->list_slider_photos(),
-            'room_photos' => $this->list_room_photos($selectedProperty, $selectedType),
+            'room_photos' => $roomPhotos,
             'room_photo_groups' => $this->list_room_photo_groups(),
-            'categories' => $this->photo_categories(),
+            'categories' => $categories,
+            'category_counts' => $categoryCounts,
         ));
     }
 
@@ -281,25 +325,43 @@ class Manage extends CI_Controller
 
     public function tenants()
     {
+        $filters = array(
+            'property_id' => (int) $this->input->get('property_id'),
+            'room_type_id' => (int) $this->input->get('room_type_id'),
+            'room_id' => (int) $this->input->get('room_id'),
+            'stay_status' => trim((string) $this->input->get('stay_status', TRUE)),
+            'q' => trim((string) $this->input->get('q', TRUE)),
+        );
+
         $this->load->view('manage/tenants', array(
             'title' => 'Penghuni | GUL HOUSE',
             'admin_name' => $this->session->userdata('gh_admin_name'),
-            'rows' => $this->Master_model->get_tenant_stays(),
+            'rows' => $this->Master_model->get_tenant_stays($filters),
             'rooms' => $this->Master_model->get_active_rooms_for_stay(),
             'properties' => $this->Master_model->get_active_properties(),
             'room_types' => $this->Master_model->get_active_room_types(),
+            'filters' => $filters,
         ));
     }
 
     public function save_tenant()
     {
+        $birthPlace = trim((string) $this->input->post('birth_place', TRUE));
+        $birthDate = $this->nullable_date($this->input->post('birth_date'));
+        $birthDateText = trim((string) $this->input->post('birth_date_text', TRUE));
+        $birthPlaceDate = trim((string) $this->input->post('birth_place_date', TRUE));
+        if ($birthPlace !== '' || $birthDate !== null || $birthDateText !== '') {
+            $birthValue = $birthDate !== null ? $birthDate : $birthDateText;
+            $birthPlaceDate = trim($birthPlace . ($birthPlace !== '' && $birthValue !== '' ? ', ' : '') . $birthValue);
+        }
+
         $payload = array(
             'stay_id' => (int) $this->input->post('stay_id'),
             'tenant_id' => (int) $this->input->post('tenant_id'),
             'room_id' => (int) $this->input->post('room_id'),
             'stay_status' => trim((string) $this->input->post('stay_status', TRUE)),
             'fullname' => trim((string) $this->input->post('fullname', TRUE)),
-            'birth_place_date' => trim((string) $this->input->post('birth_place_date', TRUE)),
+            'birth_place_date' => $birthPlaceDate,
             'religion' => trim((string) $this->input->post('religion', TRUE)),
             'identity_number' => preg_replace('/[^0-9]/', '', (string) $this->input->post('identity_number', TRUE)),
             'phone' => trim((string) $this->input->post('phone', TRUE)),
@@ -338,6 +400,7 @@ class Manage extends CI_Controller
             'room_type_id' => (int) $this->input->get('room_type_id'),
             'room_id' => (int) $this->input->get('room_id'),
             'status' => trim((string) $this->input->get('status', TRUE)),
+            'has_payment' => trim((string) $this->input->get('has_payment', TRUE)),
             'q' => trim((string) $this->input->get('q', TRUE)),
         );
 
@@ -421,7 +484,7 @@ class Manage extends CI_Controller
     private function payment_redirect_url()
     {
         $params = array();
-        foreach (array('period_id', 'property_id', 'room_type_id', 'room_id', 'status', 'q') as $key) {
+        foreach (array('period_id', 'property_id', 'room_type_id', 'room_id', 'status', 'has_payment', 'q') as $key) {
             $value = trim((string) $this->input->post_get($key, TRUE));
             if ($value !== '') {
                 $params[$key] = $value;
@@ -590,6 +653,26 @@ class Manage extends CI_Controller
             'fasilitas' => 'Fasilitas',
             'umum' => 'Area Umum',
         );
+    }
+
+    private function resolve_photo_category($value, array $categories)
+    {
+        $value = trim((string) $value);
+        if ($value === '' || strtolower($value) === 'all') {
+            return 'all';
+        }
+
+        if (isset($categories[$value])) {
+            return $categories[$value];
+        }
+
+        foreach ($categories as $label) {
+            if (strcasecmp($value, $label) === 0) {
+                return $label;
+            }
+        }
+
+        return 'all';
     }
 
     private function filename_prefix($category)

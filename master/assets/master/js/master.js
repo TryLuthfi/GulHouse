@@ -23,16 +23,30 @@
 
     function initModals() {
         document.querySelectorAll('[data-open-modal]').forEach(function (trigger) {
+            if (trigger.getAttribute('data-modal-open-ready') === 'true') {
+                return;
+            }
+
             trigger.addEventListener('click', function () {
                 openModal(document.querySelector(trigger.getAttribute('data-open-modal')));
             });
+            trigger.setAttribute('data-modal-open-ready', 'true');
         });
 
         document.querySelectorAll('[data-close-modal]').forEach(function (trigger) {
+            if (trigger.getAttribute('data-modal-close-ready') === 'true') {
+                return;
+            }
+
             trigger.addEventListener('click', function () {
                 closeModal(trigger.closest('.modal'));
             });
+            trigger.setAttribute('data-modal-close-ready', 'true');
         });
+
+        if (document.documentElement.getAttribute('data-modal-escape-ready') === 'true') {
+            return;
+        }
 
         document.addEventListener('keydown', function (event) {
             if (event.key !== 'Escape') {
@@ -41,6 +55,7 @@
 
             document.querySelectorAll('.modal.is-open').forEach(closeModal);
         });
+        document.documentElement.setAttribute('data-modal-escape-ready', 'true');
     }
 
     function initConfirmSave() {
@@ -49,6 +64,10 @@
         var confirmButton = document.querySelector('[data-confirm-save]');
 
         document.querySelectorAll('form[data-confirm-submit]').forEach(function (form) {
+            if (form.getAttribute('data-confirm-submit-ready') === 'true') {
+                return;
+            }
+
             form.addEventListener('submit', function (event) {
                 if (form.getAttribute('data-confirmed') === 'true') {
                     form.removeAttribute('data-confirmed');
@@ -59,9 +78,10 @@
                 pendingForm = form;
                 openModal(confirmModal);
             });
+            form.setAttribute('data-confirm-submit-ready', 'true');
         });
 
-        if (confirmButton) {
+        if (confirmButton && confirmButton.getAttribute('data-confirm-save-ready') !== 'true') {
             confirmButton.addEventListener('click', function () {
                 if (!pendingForm) {
                     return;
@@ -70,6 +90,7 @@
                 pendingForm.setAttribute('data-confirmed', 'true');
                 pendingForm.submit();
             });
+            confirmButton.setAttribute('data-confirm-save-ready', 'true');
         }
     }
 
@@ -80,6 +101,10 @@
         var label = document.querySelector('[data-delete-label]');
 
         document.querySelectorAll('[data-delete-url]').forEach(function (trigger) {
+            if (trigger.getAttribute('data-delete-ready') === 'true') {
+                return;
+            }
+
             trigger.addEventListener('click', function () {
                 deleteUrl = trigger.getAttribute('data-delete-url');
                 if (label) {
@@ -87,19 +112,136 @@
                 }
                 openModal(modal);
             });
+            trigger.setAttribute('data-delete-ready', 'true');
         });
 
-        if (link) {
+        if (link && link.getAttribute('data-confirm-delete-ready') !== 'true') {
             link.addEventListener('click', function () {
                 if (deleteUrl) {
                     window.location.href = deleteUrl;
                 }
             });
+            link.setAttribute('data-confirm-delete-ready', 'true');
         }
     }
 
     function rupiah(value) {
         return 'Rp ' + Number(value || 0).toLocaleString('id-ID');
+    }
+
+    function formatRupiahInput(value) {
+        var digits = String(value || '').replace(/\D/g, '');
+        if (!digits) {
+            return '';
+        }
+
+        return 'Rp ' + digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    function initMoneyInputs() {
+        document.querySelectorAll('[data-money-input]').forEach(function (input) {
+            if (input.getAttribute('data-money-ready') === 'true') {
+                return;
+            }
+
+            function sync() {
+                input.value = formatRupiahInput(input.value);
+            }
+
+            input.addEventListener('input', sync);
+            input.addEventListener('blur', sync);
+            sync();
+            input.setAttribute('data-money-ready', 'true');
+        });
+    }
+
+    function initDynamicControls() {
+        initModals();
+        initConfirmSave();
+        initConfirmDelete();
+        initMoneyInputs();
+        initRoomUploadRows();
+        initRoomCascadingFilters();
+        initPaymentCascadingFilters();
+        initPhotoCascadingFilters();
+        initTenantCascadingFilters();
+        initPhotoCategoryTabs();
+        initPhotoPreview();
+    }
+
+    function replaceMasterContent(html) {
+        var parser = new DOMParser();
+        var nextDoc = parser.parseFromString(html, 'text/html');
+        var currentMain = document.querySelector('.main-shell');
+        var nextMain = nextDoc.querySelector('.main-shell');
+
+        if (!currentMain || !nextMain) {
+            window.location.reload();
+            return;
+        }
+
+        currentMain.innerHTML = nextMain.innerHTML;
+        document.querySelectorAll('body > .modal').forEach(function (modal) {
+            modal.remove();
+        });
+        nextDoc.querySelectorAll('body > .modal').forEach(function (modal) {
+            document.body.appendChild(modal);
+        });
+        document.title = nextDoc.title || document.title;
+        initDynamicControls();
+    }
+
+    function loadMasterPartial(url, pushState) {
+        document.body.classList.add('is-partial-loading');
+        fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Request failed');
+                }
+                return response.text();
+            })
+            .then(function (html) {
+                replaceMasterContent(html);
+                if (pushState && window.history && window.history.pushState) {
+                    window.history.pushState({ ghPartial: true }, '', url);
+                }
+            })
+            .catch(function () {
+                window.location.href = url;
+            })
+            .finally(function () {
+                document.body.classList.remove('is-partial-loading');
+            });
+    }
+
+    function initMetricCardFilters() {
+        if (document.documentElement.getAttribute('data-metric-card-ready') === 'true') {
+            return;
+        }
+
+        document.addEventListener('click', function (event) {
+            var card = event.target.closest('.metric-card[href]');
+            if (!card) {
+                return;
+            }
+
+            var url = new URL(card.href, window.location.href);
+            if (url.origin !== window.location.origin || url.pathname !== window.location.pathname) {
+                return;
+            }
+
+            event.preventDefault();
+            loadMasterPartial(url.toString(), true);
+        });
+
+        window.addEventListener('popstate', function () {
+            loadMasterPartial(window.location.href, false);
+        });
+
+        document.documentElement.setAttribute('data-metric-card-ready', 'true');
     }
 
     function initCharts() {
@@ -108,7 +250,7 @@
         }
 
         var charts = window.GH_DASHBOARD_CHARTS;
-        var colors = ['#173f35', '#c9974c', '#6f8f80', '#d7b26d', '#8d9c93', '#314f46'];
+        var colors = ['#487fff', '#ff9f29', '#45b369', '#8b5cf6', '#ef4a00', '#00b8d9', '#f866b9', '#7c3aed'];
 
         function makeBar(id, data, horizontal) {
             var el = document.getElementById(id);
@@ -147,6 +289,56 @@
             });
         }
 
+        function makeDatasetBar(id, data, horizontal, stacked, moneyAxis) {
+            var el = document.getElementById(id);
+            if (!el || !data || !data.datasets) {
+                return;
+            }
+
+            new Chart(el, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: data.datasets.map(function (dataset, index) {
+                        return {
+                            label: dataset.label,
+                            data: dataset.values,
+                            backgroundColor: colors[index % colors.length],
+                            borderRadius: 7,
+                            borderSkipped: false
+                        };
+                    })
+                },
+                options: {
+                    indexAxis: horizontal ? 'y' : 'x',
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    var value = moneyAxis ? rupiah(ctx.raw) : Number(ctx.raw || 0).toLocaleString('id-ID');
+                                    return ctx.dataset.label + ': ' + value;
+                                }
+                            }
+                        }
+                    },
+                    responsive: true,
+                    scales: {
+                        x: {
+                            stacked: stacked,
+                            beginAtZero: true,
+                            ticks: { callback: horizontal && moneyAxis ? rupiah : undefined }
+                        },
+                        y: {
+                            stacked: stacked,
+                            beginAtZero: true,
+                            ticks: { callback: !horizontal && moneyAxis ? rupiah : undefined }
+                        }
+                    }
+                }
+            });
+        }
+
         function makeDoughnut(id, data) {
             var el = document.getElementById(id);
             if (!el || !data) {
@@ -175,8 +367,14 @@
         makeBar('revenueByPropertyChart', charts.revenue_by_property, false);
         makeBar('revenueByTypeChart', charts.revenue_by_type, true);
         makeBar('paymentByPeriodChart', charts.payment_by_period, false);
+        makeDatasetBar('collectionByPeriodChart', charts.collection_by_period, false, false, true);
+        makeDatasetBar('occupancyByPropertyChart', charts.occupancy_by_property, false, true, false);
         makeDoughnut('roomStatusChart', charts.rooms_by_status);
         makeDoughnut('billStatusChart', charts.bill_status_by_latest_period);
+        makeDoughnut('roomMixByTypeChart', charts.room_mix_by_type);
+        makeDoughnut('tenantStatusChart', charts.tenant_status);
+        makeDoughnut('bookingStatusChart', charts.booking_status);
+        makeDoughnut('paymentIssueChart', charts.payment_import_issues);
     }
 
     var cascadeOptionTemplates = {};
@@ -231,22 +429,32 @@
             return;
         }
 
+        var propertyOptions = getCascadeOptions(propertySelect);
         var typeOptions = getCascadeOptions(typeSelect);
 
-        function sync(keepType) {
-            var propertyCode = propertySelect.value;
+        function sync(keepProperty, keepType) {
+            var propertyCode = keepProperty ? propertySelect.value : '';
             var typeValue = keepType ? typeSelect.value : '';
+
+            setCascadeOptions(propertySelect, propertyOptions, function (option) {
+                return !option.value || csvIncludes(option.getAttribute('data-type-values'), typeValue);
+            }, propertyCode);
+
             setCascadeOptions(typeSelect, typeOptions, function (option) {
-                return !option.value || csvIncludes(option.getAttribute('data-property-codes'), propertyCode);
+                return !option.value || csvIncludes(option.getAttribute('data-property-codes'), propertySelect.value);
             }, typeValue);
         }
 
         propertySelect.addEventListener('change', function () {
-            sync(false);
+            sync(true, false);
+        });
+
+        typeSelect.addEventListener('change', function () {
+            sync(true, true);
         });
 
         scope.setAttribute('data-photo-cascade-ready', 'true');
-        sync(true);
+        sync(true, true);
     }
 
     function initPhotoCascadingFilters() {
@@ -263,8 +471,13 @@
                 return;
             }
 
+            var propertyOptions = getCascadeOptions(propertySelect);
             var typeOptions = getCascadeOptions(typeSelect);
             var roomOptions = getCascadeOptions(roomSelect);
+
+            function propertyMatches(option, typeId) {
+                return !option.value || csvIncludes(option.getAttribute('data-type-ids'), typeId);
+            }
 
             function typeMatches(option, propertyId) {
                 return !option.value || csvIncludes(option.getAttribute('data-property-ids'), propertyId);
@@ -279,26 +492,30 @@
                     && (!typeId || option.getAttribute('data-type-id') === typeId);
             }
 
-            function sync(keepType, keepRoom) {
-                var propertyId = propertySelect.value;
+            function sync(keepProperty, keepType, keepRoom) {
+                var propertyId = keepProperty ? propertySelect.value : '';
                 var typeValue = keepType ? typeSelect.value : '';
                 var roomValue = keepRoom ? roomSelect.value : '';
 
+                setCascadeOptions(propertySelect, propertyOptions, function (option) {
+                    return propertyMatches(option, typeValue);
+                }, propertyId);
+
                 setCascadeOptions(typeSelect, typeOptions, function (option) {
-                    return typeMatches(option, propertyId);
+                    return typeMatches(option, propertySelect.value);
                 }, typeValue);
 
                 setCascadeOptions(roomSelect, roomOptions, function (option) {
-                    return roomMatches(option, propertyId, typeSelect.value);
+                    return roomMatches(option, propertySelect.value, typeSelect.value);
                 }, roomValue);
             }
 
             propertySelect.addEventListener('change', function () {
-                sync(false, false);
+                sync(true, false, false);
             });
 
             typeSelect.addEventListener('change', function () {
-                sync(true, false);
+                sync(true, true, false);
             });
 
             roomSelect.addEventListener('change', function () {
@@ -307,13 +524,51 @@
                     return;
                 }
 
-                propertySelect.value = selected.getAttribute('data-property-id') || '';
-                sync(true, true);
                 typeSelect.value = selected.getAttribute('data-type-id') || '';
-                sync(true, true);
+                sync(false, true, true);
+                propertySelect.value = selected.getAttribute('data-property-id') || '';
+                sync(true, true, true);
             });
 
             form.setAttribute('data-tenant-cascade-ready', 'true');
+            sync(true, true, true);
+        });
+    }
+
+    function initRoomCascadingFilters() {
+        document.querySelectorAll('[data-room-cascade-form]').forEach(function (form) {
+            var propertySelect = form.querySelector('[data-room-property-filter]');
+            var typeSelect = form.querySelector('[data-room-type-filter]');
+
+            if (!propertySelect || !typeSelect || form.getAttribute('data-room-cascade-ready') === 'true') {
+                return;
+            }
+
+            var propertyOptions = getCascadeOptions(propertySelect);
+            var typeOptions = getCascadeOptions(typeSelect);
+
+            function sync(keepProperty, keepType) {
+                var propertyId = keepProperty ? propertySelect.value : '';
+                var typeValue = keepType ? typeSelect.value : '';
+
+                setCascadeOptions(propertySelect, propertyOptions, function (option) {
+                    return !option.value || csvIncludes(option.getAttribute('data-type-ids'), typeValue);
+                }, propertyId);
+
+                setCascadeOptions(typeSelect, typeOptions, function (option) {
+                    return !option.value || csvIncludes(option.getAttribute('data-property-ids'), propertySelect.value);
+                }, typeValue);
+            }
+
+            propertySelect.addEventListener('change', function () {
+                sync(true, false);
+            });
+
+            typeSelect.addEventListener('change', function () {
+                sync(true, true);
+            });
+
+            form.setAttribute('data-room-cascade-ready', 'true');
             sync(true, true);
         });
     }
@@ -393,30 +648,17 @@
             return;
         }
 
-        var typeOptions = Array.prototype.slice.call(typeSelect.options).map(function (option) {
-            return option.cloneNode(true);
-        });
-        var roomOptions = Array.prototype.slice.call(roomSelect.options).map(function (option) {
-            return option.cloneNode(true);
-        });
+        var propertyOptions = getCascadeOptions(propertySelect);
+        var typeOptions = getCascadeOptions(typeSelect);
+        var roomOptions = getCascadeOptions(roomSelect);
 
-        function restoreOptions(select, options, predicate, preferredValue) {
-            select.innerHTML = '';
-            options.forEach(function (option) {
-                if (predicate(option)) {
-                    select.appendChild(option.cloneNode(true));
-                }
-            });
-
-            var hasPreferred = Array.prototype.some.call(select.options, function (option) {
-                return option.value === preferredValue;
-            });
-
-            if (preferredValue && hasPreferred) {
-                select.value = preferredValue;
-            } else {
-                select.value = '';
+        function optionHasType(option, typeId) {
+            if (!option.value || !typeId) {
+                return true;
             }
+
+            var ids = (option.getAttribute('data-type-ids') || '').split(',');
+            return ids.indexOf(typeId) !== -1;
         }
 
         function optionHasProperty(option, propertyId) {
@@ -437,29 +679,95 @@
                 && (!typeId || option.getAttribute('data-type-id') === typeId);
         }
 
-        function syncFilters(keepType, keepRoom) {
-            var propertyId = propertySelect.value;
+        function syncFilters(keepProperty, keepType, keepRoom) {
+            var propertyId = keepProperty ? propertySelect.value : '';
             var typeValue = keepType ? typeSelect.value : '';
             var roomValue = keepRoom ? roomSelect.value : '';
 
-            restoreOptions(typeSelect, typeOptions, function (option) {
-                return optionHasProperty(option, propertyId);
+            setCascadeOptions(propertySelect, propertyOptions, function (option) {
+                return optionHasType(option, typeValue);
+            }, propertyId);
+
+            setCascadeOptions(typeSelect, typeOptions, function (option) {
+                return optionHasProperty(option, propertySelect.value);
             }, typeValue);
 
-            restoreOptions(roomSelect, roomOptions, function (option) {
-                return roomMatches(option, propertyId, typeSelect.value);
+            setCascadeOptions(roomSelect, roomOptions, function (option) {
+                return roomMatches(option, propertySelect.value, typeSelect.value);
             }, roomValue);
         }
 
         propertySelect.addEventListener('change', function () {
-            syncFilters(false, false);
+            syncFilters(true, false, false);
         });
 
         typeSelect.addEventListener('change', function () {
-            syncFilters(true, false);
+            syncFilters(true, true, false);
         });
 
-        syncFilters(true, true);
+        roomSelect.addEventListener('change', function () {
+            var selected = roomSelect.options[roomSelect.selectedIndex];
+            if (!selected || !selected.value) {
+                return;
+            }
+
+            typeSelect.value = selected.getAttribute('data-type-id') || '';
+            syncFilters(false, true, true);
+            propertySelect.value = selected.getAttribute('data-property-id') || '';
+            syncFilters(true, true, true);
+        });
+
+        syncFilters(true, true, true);
+    }
+
+    function initPhotoCategoryTabs() {
+        document.querySelectorAll('[data-photo-category-tabs]').forEach(function (tabs) {
+            var panel = tabs.closest('.panel') || document;
+            var buttons = Array.prototype.slice.call(tabs.querySelectorAll('[data-photo-category-filter]'));
+            var cards = Array.prototype.slice.call(panel.querySelectorAll('[data-photo-category-card]'));
+            var empty = panel.querySelector('[data-photo-category-empty]');
+
+            function applyFilter(category) {
+                var visible = 0;
+
+                buttons.forEach(function (button) {
+                    button.classList.toggle('is-active', button.getAttribute('data-photo-category-filter') === category);
+                });
+
+                cards.forEach(function (card) {
+                    var match = category === 'all' || card.getAttribute('data-photo-category') === category;
+                    card.hidden = !match;
+                    if (match) {
+                        visible++;
+                    }
+                });
+
+                if (empty) {
+                    empty.hidden = visible > 0;
+                }
+            }
+
+            buttons.forEach(function (button) {
+                button.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    var category = button.getAttribute('data-photo-category-filter') || 'all';
+                    applyFilter(category);
+
+                    if (window.history && window.history.replaceState) {
+                        var url = new URL(window.location.href);
+                        if (category === 'all') {
+                            url.searchParams.delete('category');
+                        } else {
+                            url.searchParams.set('category', category);
+                        }
+                        window.history.replaceState({}, '', url.toString());
+                    }
+                });
+            });
+
+            var active = tabs.querySelector('[data-photo-category-filter].is-active');
+            applyFilter(active ? active.getAttribute('data-photo-category-filter') || 'all' : 'all');
+        });
     }
 
     function initPhotoPreview() {
@@ -753,13 +1061,7 @@
         });
     }
 
-    initModals();
-    initConfirmSave();
-    initConfirmDelete();
+    initDynamicControls();
+    initMetricCardFilters();
     initCharts();
-    initRoomUploadRows();
-    initPaymentCascadingFilters();
-    initPhotoCascadingFilters();
-    initTenantCascadingFilters();
-    initPhotoPreview();
 }());

@@ -3,6 +3,7 @@
     $selectedProperty = isset($selected_property) ? $selected_property : '';
     $selectedType = isset($selected_type) ? $selected_type : '';
     $typePropertyMap = array();
+    $propertyTypeMap = array();
     foreach ($room_catalog as $room) {
         $typeName = (string) $room['type_name'];
         $propertyCode = (string) $room['property_code'];
@@ -13,6 +14,10 @@
             $typePropertyMap[$typeName] = array();
         }
         $typePropertyMap[$typeName][$propertyCode] = $propertyCode;
+        if (empty($propertyTypeMap[$propertyCode])) {
+            $propertyTypeMap[$propertyCode] = array();
+        }
+        $propertyTypeMap[$propertyCode][$typeName] = $typeName;
     }
 ?>
 <!doctype html>
@@ -24,7 +29,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20260911-cascade'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261001-partial-metric'); ?>">
 </head>
 <body>
     <aside class="sidebar">
@@ -100,10 +105,14 @@
             </div>
             <form class="filter-form" method="get" action="<?= base_url('photos'); ?>" data-photo-cascade-form>
                 <label>Gedung
-                    <select name="property" data-photo-property>
+                    <select name="property" data-photo-property data-cascade-template="photo-filter-properties">
                         <option value="">Pilih gedung</option>
                         <?php foreach ($properties as $property): ?>
-                            <option value="<?= html_escape($property['code']); ?>" <?= $selectedProperty === $property['code'] ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
+                            <?php
+                                $propertyCode = (string) $property['code'];
+                                $typeNames = ! empty($propertyTypeMap[$propertyCode]) ? implode(',', array_values($propertyTypeMap[$propertyCode])) : '';
+                            ?>
+                            <option value="<?= html_escape($propertyCode); ?>" data-type-values="<?= html_escape($typeNames); ?>" <?= $selectedProperty === $propertyCode ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </label>
@@ -121,10 +130,17 @@
 
             <?php if ($selectedProperty && $selectedType): ?>
                 <p class="panel-copy">Menampilkan foto untuk <strong><?= html_escape($selectedProperty . ' - ' . $selectedType); ?></strong>.</p>
-                <?php if ($room_photos): ?>
-                    <div class="photo-grid">
+                <?php if ((int) $category_counts['all'] > 0): ?>
+                    <?php $activeCategory = isset($selected_category) ? $selected_category : 'all'; ?>
+                    <div class="photo-category-tabs" data-photo-category-tabs>
+                        <a class="<?= $activeCategory === 'all' ? 'is-active' : ''; ?>" href="<?= base_url('photos?property=' . rawurlencode($selectedProperty) . '&type=' . rawurlencode($selectedType)); ?>" data-photo-category-filter="all">Semua foto (<?= (int) $category_counts['all']; ?>)</a>
+                        <?php foreach ($categories as $label): ?>
+                            <a class="<?= $activeCategory === $label ? 'is-active' : ''; ?>" href="<?= base_url('photos?property=' . rawurlencode($selectedProperty) . '&type=' . rawurlencode($selectedType) . '&category=' . rawurlencode($label)); ?>" data-photo-category-filter="<?= html_escape($label); ?>"><?= html_escape($label); ?> (<?= (int) $category_counts[$label]; ?>)</a>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="photo-grid" data-photo-category-grid>
                         <?php foreach ($room_photos as $photo): ?>
-                            <article class="photo-card">
+                            <article class="photo-card" data-photo-category-card data-photo-category="<?= html_escape($photo['category']); ?>">
                                 <button
                                     type="button"
                                     class="photo-preview-trigger"
@@ -147,6 +163,7 @@
                             </article>
                         <?php endforeach; ?>
                     </div>
+                    <div class="empty-panel photo-category-empty" data-photo-category-empty <?= $room_photos ? 'hidden' : ''; ?>>Tidak ada foto di kategori ini.</div>
                 <?php else: ?>
                     <div class="empty-panel">Belum ada foto untuk pilihan ini.</div>
                 <?php endif; ?>
@@ -176,11 +193,14 @@
         <div class="modal-backdrop" data-close-modal></div>
         <section class="modal-card">
             <div class="modal-head"><h2>Upload Slider</h2><button type="button" data-close-modal>x</button></div>
-            <form class="manage-form" method="post" action="<?= base_url('photos/upload-slider'); ?>" enctype="multipart/form-data" data-confirm-submit>
-                <label>Foto Slider
-                    <input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple required>
-                </label>
-                <button type="submit">Upload Foto</button>
+            <form class="manage-form sectioned" method="post" action="<?= base_url('photos/upload-slider'); ?>" enctype="multipart/form-data" data-confirm-submit>
+                <div class="form-section">
+                    <h3 class="form-section-title">File Slider</h3>
+                    <label class="full">Foto Slider
+                        <input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple required>
+                    </label>
+                </div>
+                <div class="form-actions"><button type="submit">Upload Foto</button></div>
             </form>
         </section>
     </div>
@@ -189,38 +209,45 @@
         <div class="modal-backdrop" data-close-modal></div>
         <section class="modal-card wide">
             <div class="modal-head"><h2>Upload Foto Kamar</h2><button type="button" data-close-modal>x</button></div>
-            <form class="manage-form room-batch-upload" method="post" action="<?= base_url('photos/upload-room'); ?>" enctype="multipart/form-data" data-confirm-submit data-room-upload-form>
-                <div class="room-upload-rows" data-room-upload-rows>
-                    <div class="room-upload-row" data-room-upload-row>
-                        <input type="hidden" name="upload_rows[0][field]" value="photos_0" data-room-upload-field>
-                        <label>Gedung
-                            <select name="upload_rows[0][property_code]" required data-room-upload-name="property_code" data-photo-property>
-                                <option value="">Pilih gedung</option>
-                                <?php foreach ($properties as $property): ?>
-                                    <option value="<?= html_escape($property['code']); ?>" <?= $selectedProperty === $property['code'] ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label>Tipe Kamar
-                            <select name="upload_rows[0][room_type]" required data-room-upload-name="room_type" data-photo-type data-cascade-template="photo-room-types">
-                                <option value="">Pilih tipe</option>
-                                <?php foreach ($room_types as $type): ?>
-                                    <?php $propertyCodes = ! empty($typePropertyMap[$type['name']]) ? implode(',', array_values($typePropertyMap[$type['name']])) : ''; ?>
-                                    <option value="<?= html_escape($type['name']); ?>" data-property-codes="<?= html_escape($propertyCodes); ?>" <?= $selectedType === $type['name'] ? 'selected' : ''; ?>><?= html_escape($type['name']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label>Kategori
-                            <select name="upload_rows[0][category]" required data-room-upload-name="category">
-                                <?php foreach ($categories as $value => $label): ?>
-                                    <option value="<?= html_escape($value); ?>"><?= html_escape($label); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label>Foto
-                            <input type="file" name="photos_0[]" accept="image/jpeg,image/png,image/webp" multiple required data-room-upload-files>
-                        </label>
-                        <button type="button" class="table-action danger" data-room-upload-remove>Hapus Row</button>
+            <form class="manage-form room-batch-upload sectioned" method="post" action="<?= base_url('photos/upload-room'); ?>" enctype="multipart/form-data" data-confirm-submit data-room-upload-form>
+                <div class="form-section">
+                    <h3 class="form-section-title">Target Galeri dan File</h3>
+                    <div class="room-upload-rows full" data-room-upload-rows>
+                        <div class="room-upload-row" data-room-upload-row>
+                            <input type="hidden" name="upload_rows[0][field]" value="photos_0" data-room-upload-field>
+                            <label>Gedung
+                                <select name="upload_rows[0][property_code]" required data-room-upload-name="property_code" data-photo-property data-cascade-template="photo-upload-properties">
+                                    <option value="">Pilih gedung</option>
+                                    <?php foreach ($properties as $property): ?>
+                                        <?php
+                                            $propertyCode = (string) $property['code'];
+                                            $typeNames = ! empty($propertyTypeMap[$propertyCode]) ? implode(',', array_values($propertyTypeMap[$propertyCode])) : '';
+                                        ?>
+                                        <option value="<?= html_escape($propertyCode); ?>" data-type-values="<?= html_escape($typeNames); ?>" <?= $selectedProperty === $propertyCode ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <label>Tipe Kamar
+                                <select name="upload_rows[0][room_type]" required data-room-upload-name="room_type" data-photo-type data-cascade-template="photo-room-types">
+                                    <option value="">Pilih tipe</option>
+                                    <?php foreach ($room_types as $type): ?>
+                                        <?php $propertyCodes = ! empty($typePropertyMap[$type['name']]) ? implode(',', array_values($typePropertyMap[$type['name']])) : ''; ?>
+                                        <option value="<?= html_escape($type['name']); ?>" data-property-codes="<?= html_escape($propertyCodes); ?>" <?= $selectedType === $type['name'] ? 'selected' : ''; ?>><?= html_escape($type['name']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <label>Kategori
+                                <select name="upload_rows[0][category]" required data-room-upload-name="category">
+                                    <?php foreach ($categories as $value => $label): ?>
+                                        <option value="<?= html_escape($value); ?>"><?= html_escape($label); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <label>Foto
+                                <input type="file" name="photos_0[]" accept="image/jpeg,image/png,image/webp" multiple required data-room-upload-files>
+                            </label>
+                            <button type="button" class="table-action danger" data-room-upload-remove>Hapus Row</button>
+                        </div>
                     </div>
                 </div>
                 <div class="room-upload-actions">
@@ -276,6 +303,6 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js?v=20260911-cascade'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261001-partial-metric'); ?>"></script>
 </body>
 </html>

@@ -430,20 +430,92 @@ class Landing_model extends CI_Model
             return $uploadedGallery;
         }
 
-        return array(
+        $masterPreview = $this->get_preview_photos(8);
+        if ($masterPreview) {
+            return $masterPreview;
+        }
+
+        return $this->fallback_preview_photos(8, $room['name']);
+    }
+
+    public function get_preview_photos($limit = 4)
+    {
+        $root = realpath(FCPATH . '../uploads');
+        $allowed = array('jpg', 'jpeg', 'png', 'webp');
+        $photos = array();
+        $limit = max(1, (int) $limit);
+
+        if (! $root || ! is_dir($root)) {
+            return $this->fallback_preview_photos($limit);
+        }
+
+        foreach (new DirectoryIterator($root) as $propertyDir) {
+            if (! $propertyDir->isDir() || $propertyDir->isDot()) {
+                continue;
+            }
+
+            $property = strtoupper($propertyDir->getFilename());
+            if ($property === 'SLIDER') {
+                continue;
+            }
+
+            foreach (new DirectoryIterator($propertyDir->getPathname()) as $typeDir) {
+                if (! $typeDir->isDir() || $typeDir->isDot()) {
+                    continue;
+                }
+
+                foreach (new DirectoryIterator($typeDir->getPathname()) as $file) {
+                    if (! $file->isFile()) {
+                        continue;
+                    }
+
+                    $extension = strtolower($file->getExtension());
+                    if (! in_array($extension, $allowed, TRUE)) {
+                        continue;
+                    }
+
+                    $filename = $file->getFilename();
+                    $category = $this->gallery_category_from_filename($filename);
+                    $photos[] = array(
+                        'category' => $category,
+                        'title' => $this->gallery_title_from_filename($filename, $category, $propertyDir->getFilename(), $typeDir->getFilename()),
+                        'src' => base_url('index.php/media/gallery/' . rawurlencode($propertyDir->getFilename()) . '/' . rawurlencode($typeDir->getFilename()) . '/' . rawurlencode($filename)),
+                        'filename' => $filename,
+                    );
+                }
+            }
+        }
+
+        usort($photos, function ($left, $right) {
+            $leftScore = stripos($left['filename'], 'kamar_01') === 0 ? 0 : (stripos($left['filename'], 'kamar') === 0 ? 1 : 2);
+            $rightScore = stripos($right['filename'], 'kamar_01') === 0 ? 0 : (stripos($right['filename'], 'kamar') === 0 ? 1 : 2);
+
+            if ($leftScore === $rightScore) {
+                return strnatcasecmp($left['title'], $right['title']);
+            }
+
+            return $leftScore - $rightScore;
+        });
+
+        return $photos ? array_slice($photos, 0, $limit) : $this->fallback_preview_photos($limit);
+    }
+
+    private function fallback_preview_photos($limit = 4, $roomName = 'GUL HOUSE')
+    {
+        $photos = array(
             array(
                 'category' => 'Kamar',
-                'title' => $room['name'] . ' - Sudut tidur',
+                'title' => $roomName . ' - Sudut tidur',
                 'src' => 'https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=1400&q=86',
             ),
             array(
                 'category' => 'Kamar',
-                'title' => $room['name'] . ' - Area kerja',
+                'title' => $roomName . ' - Area kerja',
                 'src' => 'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1400&q=86',
             ),
             array(
                 'category' => 'Kamar',
-                'title' => $room['name'] . ' - Penyimpanan',
+                'title' => $roomName . ' - Penyimpanan',
                 'src' => 'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=1400&q=86',
             ),
             array(
@@ -472,6 +544,8 @@ class Landing_model extends CI_Model
                 'src' => 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=86',
             ),
         );
+
+        return array_slice($photos, 0, max(1, (int) $limit));
     }
 
     private function get_uploaded_room_gallery(array $room)
@@ -651,6 +725,245 @@ class Landing_model extends CI_Model
             PRIMARY KEY (`id`),
             KEY `idx_status_created` (`status`, `created_at`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+    }
+
+    public function find_tenant_payment_access($phone, $nikLast4)
+    {
+        if ( ! $this->table_exists('gh_tenants') || ! $this->table_exists('gh_tenant_stays') || ! $this->table_exists('gh_rooms')) {
+            return null;
+        }
+
+        $phoneDigits = $this->only_digits($phone);
+        $nikLast4 = $this->only_digits($nikLast4);
+
+        if (strlen($phoneDigits) < 8 || strlen($nikLast4) !== 4) {
+            return null;
+        }
+
+        $rows = $this->db
+            ->select('t.id AS tenant_id, t.fullname, t.identity_number, t.phone')
+            ->select('s.id AS stay_id, s.stay_status, s.monthly_price AS stay_price, s.deposit, s.check_in_date')
+            ->select('r.id AS room_id, r.room_label, r.monthly_price AS room_price')
+            ->select('p.code AS property_code, p.name AS property_name')
+            ->select('rt.name AS room_type')
+            ->from('gh_tenant_stays s')
+            ->join('gh_tenants t', 't.id = s.tenant_id')
+            ->join('gh_rooms r', 'r.id = s.room_id')
+            ->join('gh_properties p', 'p.id = r.property_id', 'left')
+            ->join('gh_room_types rt', 'rt.id = r.room_type_id', 'left')
+            ->where_in('s.stay_status', array('active', 'reserved'))
+            ->where('RIGHT(t.identity_number, 4) = ' . $this->db->escape($nikLast4), null, FALSE)
+            ->order_by('s.stay_status', 'ASC')
+            ->order_by('s.id', 'DESC')
+            ->limit(12)
+            ->get()
+            ->result_array();
+
+        foreach ($rows as $row) {
+            if ($this->phone_matches($row['phone'], $phoneDigits)) {
+                return $this->normalize_payment_context($row);
+            }
+        }
+
+        return null;
+    }
+
+    public function get_payment_context($tenantId, $stayId)
+    {
+        if ( ! $this->table_exists('gh_tenants') || ! $this->table_exists('gh_tenant_stays') || ! $this->table_exists('gh_rooms')) {
+            return null;
+        }
+
+        $row = $this->db
+            ->select('t.id AS tenant_id, t.fullname, t.identity_number, t.phone')
+            ->select('s.id AS stay_id, s.stay_status, s.monthly_price AS stay_price, s.deposit, s.check_in_date')
+            ->select('r.id AS room_id, r.room_label, r.monthly_price AS room_price')
+            ->select('p.code AS property_code, p.name AS property_name')
+            ->select('rt.name AS room_type')
+            ->from('gh_tenant_stays s')
+            ->join('gh_tenants t', 't.id = s.tenant_id')
+            ->join('gh_rooms r', 'r.id = s.room_id')
+            ->join('gh_properties p', 'p.id = r.property_id', 'left')
+            ->join('gh_room_types rt', 'rt.id = r.room_type_id', 'left')
+            ->where('t.id', $tenantId)
+            ->where('s.id', $stayId)
+            ->limit(1)
+            ->get()
+            ->row_array();
+
+        return $row ? $this->normalize_payment_context($row) : null;
+    }
+
+    public function get_current_payment_bill(array $context)
+    {
+        $period = $this->get_payment_period();
+
+        if ( ! $period || ! $this->table_exists('gh_room_bills')) {
+            return $this->draft_payment_bill($context, $period);
+        }
+
+        $bill = $this->base_bill_query($context)
+            ->where('rb.period_id', (int) $period['id'])
+            ->limit(1)
+            ->get()
+            ->row_array();
+
+        return $bill ? $this->normalize_payment_bill($bill) : $this->draft_payment_bill($context, $period);
+    }
+
+    public function get_payment_bill_history(array $context, $limit = 8)
+    {
+        if ( ! $this->table_exists('gh_room_bills') || ! $this->table_exists('gh_billing_periods')) {
+            return array();
+        }
+
+        $rows = $this->base_bill_query($context)
+            ->order_by('bp.period_key', 'DESC')
+            ->limit((int) $limit)
+            ->get()
+            ->result_array();
+
+        $history = array();
+        foreach ($rows as $row) {
+            $history[] = $this->normalize_payment_bill($row);
+        }
+
+        return $history;
+    }
+
+    public function get_bill_payments($billId)
+    {
+        if ( ! $this->table_exists('gh_payments')) {
+            return array();
+        }
+
+        return $this->db
+            ->select('payment_date, payment_date_text, amount, payment_type, method, reference_no, notes')
+            ->from('gh_payments')
+            ->where('room_bill_id', $billId)
+            ->order_by('COALESCE(payment_date, created_at)', 'DESC', FALSE)
+            ->order_by('id', 'DESC')
+            ->get()
+            ->result_array();
+    }
+
+    private function base_bill_query(array $context)
+    {
+        $this->db
+            ->select('rb.*, bp.period_key, bp.period_label')
+            ->from('gh_room_bills rb')
+            ->join('gh_billing_periods bp', 'bp.id = rb.period_id')
+            ->where('rb.room_id', (int) $context['room_id']);
+
+        if (! empty($context['tenant_id']) || ! empty($context['phone']) || ! empty($context['fullname'])) {
+            $this->db->group_start();
+            $this->db->where('rb.tenant_id', (int) $context['tenant_id']);
+            if (! empty($context['phone'])) {
+                $this->db->or_where('rb.tenant_phone_snapshot', $context['phone']);
+            }
+            if (! empty($context['fullname'])) {
+                $this->db->or_where('rb.tenant_name_snapshot', $context['fullname']);
+            }
+            $this->db->group_end();
+        }
+
+        return $this->db;
+    }
+
+    private function get_payment_period()
+    {
+        if ( ! $this->table_exists('gh_billing_periods')) {
+            return null;
+        }
+
+        $current = date('Y-m');
+        $row = $this->db
+            ->where('period_key', $current)
+            ->get('gh_billing_periods')
+            ->row_array();
+
+        if ($row) {
+            return $row;
+        }
+
+        return $this->db
+            ->order_by('period_key', 'DESC')
+            ->limit(1)
+            ->get('gh_billing_periods')
+            ->row_array();
+    }
+
+    private function draft_payment_bill(array $context, $period = null)
+    {
+        $amount = (int) ($context['stay_price'] ? $context['stay_price'] : $context['room_price']);
+
+        return array(
+            'id' => null,
+            'period_key' => $period ? $period['period_key'] : date('Y-m'),
+            'period_label' => $period ? $period['period_label'] : strtoupper(date('F Y')),
+            'base_price' => $amount,
+            'deposit_amount' => (int) $context['deposit'],
+            'due_date' => null,
+            'due_date_text' => '',
+            'paid_total' => 0,
+            'past_due_amount' => 0,
+            'future_due_amount' => 0,
+            'remaining_amount' => $amount,
+            'bill_status' => 'unknown',
+            'notes' => 'Tagihan untuk periode ini belum dibuat di master.',
+            'is_draft' => TRUE,
+        );
+    }
+
+    private function normalize_payment_bill(array $bill)
+    {
+        $base = (int) $bill['base_price'];
+        $deposit = (int) $bill['deposit_amount'];
+        $paid = (int) $bill['paid_total'];
+        $target = max($base, 0);
+
+        if ($target === 0 && $deposit > 0) {
+            $target = $deposit;
+        }
+
+        $bill['remaining_amount'] = max(0, $target - $paid);
+        $bill['is_draft'] = FALSE;
+
+        return $bill;
+    }
+
+    private function normalize_payment_context(array $row)
+    {
+        $row['tenant_id'] = (int) $row['tenant_id'];
+        $row['stay_id'] = (int) $row['stay_id'];
+        $row['room_id'] = (int) $row['room_id'];
+        $row['stay_price'] = (int) $row['stay_price'];
+        $row['room_price'] = (int) $row['room_price'];
+        $row['deposit'] = (int) $row['deposit'];
+        $row['display_room'] = trim($row['property_code'] . ' - ' . $row['room_label']);
+        $row['display_type'] = trim($row['property_code'] . ' - ' . $row['room_type']);
+
+        return $row;
+    }
+
+    private function phone_matches($storedPhone, $inputDigits)
+    {
+        $storedDigits = $this->only_digits($storedPhone);
+
+        if ($storedDigits === '' || $inputDigits === '') {
+            return FALSE;
+        }
+
+        if ($storedDigits === $inputDigits) {
+            return TRUE;
+        }
+
+        return substr($storedDigits, -8) === substr($inputDigits, -8);
+    }
+
+    private function only_digits($value)
+    {
+        return preg_replace('/\D+/', '', (string) $value);
     }
 
     private function table_exists($table)

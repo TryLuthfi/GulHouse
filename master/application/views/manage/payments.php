@@ -3,6 +3,9 @@
     function gh_money($value) {
         return $value !== null && $value !== '' ? 'Rp ' . number_format((int) $value, 0, ',', '.') : '-';
     }
+    function gh_money_input($value) {
+        return $value !== null && $value !== '' ? 'Rp ' . number_format((int) $value, 0, ',', '.') : '';
+    }
     $billStatuses = array(
         '' => 'Semua Status',
         'paid' => 'Paid',
@@ -16,6 +19,7 @@
     );
     $renderedBillModals = array();
     $typePropertyMap = array();
+    $propertyTypeMap = array();
     foreach ($rooms as $room) {
         $typeId = (int) $room['room_type_id'];
         $propertyId = (int) $room['property_id'];
@@ -26,7 +30,37 @@
             $typePropertyMap[$typeId] = array();
         }
         $typePropertyMap[$typeId][$propertyId] = $propertyId;
+        if (empty($propertyTypeMap[$propertyId])) {
+            $propertyTypeMap[$propertyId] = array();
+        }
+        $propertyTypeMap[$propertyId][$typeId] = $typeId;
     }
+    $metricUrl = function (array $set = array()) use ($filters) {
+        $params = $filters;
+        $active = ! empty($set);
+        foreach ($set as $key => $value) {
+            if (! isset($filters[$key]) || (string) $filters[$key] !== (string) $value) {
+                $active = FALSE;
+                break;
+            }
+        }
+
+        if ($active) {
+            foreach (array_keys($set) as $key) {
+                unset($params[$key]);
+            }
+        } else {
+            foreach ($set as $key => $value) {
+                $params[$key] = $value;
+            }
+        }
+
+        $params = array_filter($params, function ($value) {
+            return $value !== '' && $value !== null && $value !== 0;
+        });
+
+        return base_url('payments' . ($params ? '?' . http_build_query($params) : ''));
+    };
 ?>
 <!doctype html>
 <html lang="id">
@@ -37,7 +71,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20260911-payments'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261001-partial-metric'); ?>">
 </head>
 <body>
     <aside class="sidebar">
@@ -64,10 +98,10 @@
         <?php if ($this->session->flashdata('error')): ?><div class="notice error"><?= html_escape($this->session->flashdata('error')); ?></div><?php endif; ?>
 
         <section class="metric-grid">
-            <article><span>Total Bill</span><strong><?= number_format((int) $summary['bills'], 0, ',', '.'); ?></strong></article>
-            <article><span>Total Terbayar</span><strong><?= gh_money($summary['paid_total']); ?></strong></article>
-            <article><span>Transaksi</span><strong><?= number_format((int) $summary['payment_count'], 0, ',', '.'); ?></strong></article>
-            <article><span>Kamar Kosong</span><strong><?= number_format((int) $summary['empty_rooms'], 0, ',', '.'); ?></strong></article>
+            <a class="metric-card" href="<?= base_url('payments'); ?>"><span>Total Bill</span><strong><?= number_format((int) $summary['bills'], 0, ',', '.'); ?></strong></a>
+            <a class="metric-card <?= $filters['status'] === 'paid' ? 'is-active' : ''; ?>" href="<?= $metricUrl(array('status' => 'paid')); ?>"><span>Total Terbayar</span><strong><?= gh_money($summary['paid_total']); ?></strong></a>
+            <a class="metric-card <?= isset($filters['has_payment']) && $filters['has_payment'] === '1' ? 'is-active' : ''; ?>" href="<?= $metricUrl(array('has_payment' => '1')); ?>"><span>Transaksi</span><strong><?= number_format((int) $summary['payment_count'], 0, ',', '.'); ?></strong></a>
+            <a class="metric-card <?= $filters['status'] === 'empty' ? 'is-active' : ''; ?>" href="<?= $metricUrl(array('status' => 'empty')); ?>"><span>Kamar Kosong</span><strong><?= number_format((int) $summary['empty_rooms'], 0, ',', '.'); ?></strong></a>
         </section>
 
         <section class="panel">
@@ -75,6 +109,7 @@
                 <div><p>Filter</p><h2>Monitoring Pembayaran</h2></div>
             </div>
             <form class="filter-form payment-filter-form" method="get" action="<?= base_url('payments'); ?>" data-payment-cascade-form>
+                <?php if (! empty($filters['has_payment'])): ?><input type="hidden" name="has_payment" value="<?= html_escape($filters['has_payment']); ?>"><?php endif; ?>
                 <label>Periode
                     <select name="period_id">
                         <option value="">Semua periode</option>
@@ -84,10 +119,14 @@
                     </select>
                 </label>
                 <label>Properti
-                    <select name="property_id" data-cascade-property>
+                    <select name="property_id" data-cascade-property data-cascade-template="payment-filter-properties">
                         <option value="">Semua properti</option>
                         <?php foreach ($properties as $property): ?>
-                            <option value="<?= (int) $property['id']; ?>" <?= (int) $filters['property_id'] === (int) $property['id'] ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
+                            <?php
+                                $propertyId = (int) $property['id'];
+                                $typeIds = ! empty($propertyTypeMap[$propertyId]) ? implode(',', array_values($propertyTypeMap[$propertyId])) : '';
+                            ?>
+                            <option value="<?= $propertyId; ?>" data-type-ids="<?= html_escape($typeIds); ?>" <?= (int) $filters['property_id'] === $propertyId ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </label>
@@ -200,26 +239,35 @@
                 <div class="modal-backdrop" data-close-modal></div>
                 <section class="modal-card wide">
                     <div class="modal-head"><h2>Edit Bill <?= html_escape($row['room_label']); ?></h2><button type="button" data-close-modal>x</button></div>
-                    <form class="manage-form payment-form" method="post" action="<?= base_url('payments/save-bill'); ?>" data-confirm-submit>
+                    <form class="manage-form payment-form sectioned" method="post" action="<?= base_url('payments/save-bill'); ?>" data-confirm-submit>
                         <input type="hidden" name="bill_id" value="<?= (int) $row['id']; ?>">
                         <?php foreach ($filters as $key => $value): ?><input type="hidden" name="<?= html_escape($key); ?>" value="<?= html_escape($value); ?>"><?php endforeach; ?>
-                        <label>Periode<input type="text" value="<?= html_escape($row['period_label']); ?>" disabled></label>
-                        <label>Kamar<input type="text" value="<?= html_escape($row['room_label']); ?>" disabled></label>
-                        <label>Harga Dasar<input type="text" name="base_price" inputmode="numeric" value="<?= html_escape((string) $row['base_price']); ?>"></label>
-                        <label>Deposit<input type="text" name="deposit_amount" inputmode="numeric" value="<?= html_escape((string) $row['deposit_amount']); ?>"></label>
-                        <label>Tanggal JT<input type="date" name="due_date" value="<?= html_escape((string) $row['due_date']); ?>"></label>
-                        <label>Total Terbayar<input type="text" name="paid_total" inputmode="numeric" value="<?= html_escape((string) $row['paid_total']); ?>"></label>
-                        <label>Sudah JT<input type="text" name="past_due_amount" inputmode="numeric" value="<?= html_escape((string) $row['past_due_amount']); ?>"></label>
-                        <label>Belum JT<input type="text" name="future_due_amount" inputmode="numeric" value="<?= html_escape((string) $row['future_due_amount']); ?>"></label>
-                        <label>Status
-                            <select name="bill_status">
-                                <?php foreach ($billStatuses as $value => $label): if ($value === '') continue; ?>
-                                    <option value="<?= html_escape($value); ?>" <?= $row['bill_status'] === $value ? 'selected' : ''; ?>><?= html_escape($label); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label class="full">Catatan<textarea name="notes" rows="3"><?= html_escape((string) $row['notes']); ?></textarea></label>
-                        <button type="submit">Simpan Bill</button>
+                        <div class="form-section">
+                            <h3 class="form-section-title">Referensi Bill</h3>
+                            <label>Periode<input type="text" value="<?= html_escape($row['period_label']); ?>" disabled></label>
+                            <label>Kamar<input type="text" value="<?= html_escape($row['room_label']); ?>" disabled></label>
+                            <label>Tanggal JT<input type="date" name="due_date" value="<?= html_escape((string) $row['due_date']); ?>"></label>
+                            <label>Status
+                                <select name="bill_status">
+                                    <?php foreach ($billStatuses as $value => $label): if ($value === '') continue; ?>
+                                        <option value="<?= html_escape($value); ?>" <?= $row['bill_status'] === $value ? 'selected' : ''; ?>><?= html_escape($label); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                        </div>
+                        <div class="form-section">
+                            <h3 class="form-section-title">Nominal Tagihan</h3>
+                            <label>Harga Dasar<input type="text" name="base_price" inputmode="numeric" value="<?= html_escape(gh_money_input($row['base_price'])); ?>" placeholder="Rp 2.500.000" data-money-input></label>
+                            <label>Deposit<input type="text" name="deposit_amount" inputmode="numeric" value="<?= html_escape(gh_money_input($row['deposit_amount'])); ?>" placeholder="Rp 1.000.000" data-money-input></label>
+                            <label>Total Terbayar<input type="text" name="paid_total" inputmode="numeric" value="<?= html_escape(gh_money_input($row['paid_total'])); ?>" placeholder="Rp 2.500.000" data-money-input></label>
+                            <label>Sudah JT<input type="text" name="past_due_amount" inputmode="numeric" value="<?= html_escape(gh_money_input($row['past_due_amount'])); ?>" placeholder="Rp 0" data-money-input></label>
+                            <label>Belum JT<input type="text" name="future_due_amount" inputmode="numeric" value="<?= html_escape(gh_money_input($row['future_due_amount'])); ?>" placeholder="Rp 0" data-money-input></label>
+                        </div>
+                        <div class="form-section">
+                            <h3 class="form-section-title">Catatan</h3>
+                            <label class="full">Catatan<textarea name="notes" rows="3"><?= html_escape((string) $row['notes']); ?></textarea></label>
+                        </div>
+                        <div class="form-actions"><button type="submit">Simpan Bill</button></div>
                     </form>
                 </section>
             </div>
@@ -229,26 +277,35 @@
             <div class="modal-backdrop" data-close-modal></div>
             <section class="modal-card wide">
                 <div class="modal-head"><h2><?= $row['payment_id'] ? 'Edit Pembayaran' : 'Tambah Pembayaran'; ?> <?= html_escape($row['room_label']); ?></h2><button type="button" data-close-modal>x</button></div>
-                <form class="manage-form payment-form" method="post" action="<?= base_url('payments/save-payment'); ?>" data-confirm-submit>
+                <form class="manage-form payment-form sectioned" method="post" action="<?= base_url('payments/save-payment'); ?>" data-confirm-submit>
                     <input type="hidden" name="payment_id" value="<?= (int) $row['payment_id']; ?>">
                     <input type="hidden" name="room_bill_id" value="<?= (int) $row['id']; ?>">
                     <?php foreach ($filters as $key => $value): ?><input type="hidden" name="<?= html_escape($key); ?>" value="<?= html_escape($value); ?>"><?php endforeach; ?>
-                    <label>Periode<input type="text" value="<?= html_escape($row['period_label']); ?>" disabled></label>
-                    <label>Kamar<input type="text" value="<?= html_escape($row['room_label']); ?>" disabled></label>
-                    <label>Tanggal Bayar<input type="date" name="payment_date" value="<?= html_escape((string) $row['payment_date']); ?>"></label>
-                    <label>Teks Tanggal<input type="text" name="payment_date_text" value="<?= html_escape((string) $row['payment_date_text']); ?>" placeholder="26-Sep"></label>
-                    <label>Nilai<input type="text" name="amount" inputmode="numeric" required value="<?= html_escape((string) $row['payment_amount']); ?>"></label>
-                    <label>Tipe
-                        <select name="payment_type">
-                            <?php foreach (array('rent' => 'Sewa', 'deposit' => 'Deposit', 'other' => 'Lainnya') as $value => $label): ?>
-                                <option value="<?= $value; ?>" <?= $row['payment_type'] === $value ? 'selected' : ''; ?>><?= $label; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </label>
-                    <label>Metode<input type="text" name="method" value="<?= html_escape((string) $row['method']); ?>" placeholder="Transfer/Cash"></label>
-                    <label>Referensi<input type="text" name="reference_no" value="<?= html_escape((string) $row['reference_no']); ?>"></label>
-                    <label class="full">Catatan<textarea name="notes" rows="3"><?= html_escape((string) $row['payment_notes']); ?></textarea></label>
-                    <button type="submit">Simpan Pembayaran</button>
+                    <div class="form-section">
+                        <h3 class="form-section-title">Referensi Pembayaran</h3>
+                        <label>Periode<input type="text" value="<?= html_escape($row['period_label']); ?>" disabled></label>
+                        <label>Kamar<input type="text" value="<?= html_escape($row['room_label']); ?>" disabled></label>
+                    </div>
+                    <div class="form-section">
+                        <h3 class="form-section-title">Detail Transaksi</h3>
+                        <label>Tanggal Bayar<input type="date" name="payment_date" value="<?= html_escape((string) $row['payment_date']); ?>"></label>
+                        <label>Teks Tanggal<input type="text" name="payment_date_text" value="<?= html_escape((string) $row['payment_date_text']); ?>" placeholder="26-Sep"></label>
+                        <label>Nilai<input type="text" name="amount" inputmode="numeric" required value="<?= html_escape(gh_money_input($row['payment_amount'])); ?>" placeholder="Rp 2.500.000" data-money-input></label>
+                        <label>Tipe
+                            <select name="payment_type">
+                                <?php foreach (array('rent' => 'Sewa', 'deposit' => 'Deposit', 'other' => 'Lainnya') as $value => $label): ?>
+                                    <option value="<?= $value; ?>" <?= $row['payment_type'] === $value ? 'selected' : ''; ?>><?= $label; ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>Metode<input type="text" name="method" value="<?= html_escape((string) $row['method']); ?>" placeholder="Transfer/Cash"></label>
+                        <label>Referensi<input type="text" name="reference_no" value="<?= html_escape((string) $row['reference_no']); ?>"></label>
+                    </div>
+                    <div class="form-section">
+                        <h3 class="form-section-title">Catatan</h3>
+                        <label class="full">Catatan<textarea name="notes" rows="3"><?= html_escape((string) $row['payment_notes']); ?></textarea></label>
+                    </div>
+                    <div class="form-actions"><button type="submit">Simpan Pembayaran</button></div>
                 </form>
             </section>
         </div>
@@ -272,6 +329,6 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js?v=20260911-payments'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261001-partial-metric'); ?>"></script>
 </body>
 </html>

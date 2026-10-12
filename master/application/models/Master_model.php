@@ -3,11 +3,14 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Master_model extends CI_Model
 {
-    public function get_properties()
+    public function get_properties(array $filters = array())
     {
+        $this->db->from('gh_properties');
+        $this->apply_property_filters($filters);
+
         return $this->db
             ->order_by('code', 'ASC')
-            ->get('gh_properties')
+            ->get()
             ->result_array();
     }
 
@@ -57,11 +60,24 @@ class Master_model extends CI_Model
             ->update('gh_properties', array('is_active' => 0));
     }
 
-    public function get_room_types()
+    public function get_room_types(array $filters = array())
     {
+        $this->db
+            ->select('rt.*')
+            ->select('COUNT(r.id) AS room_count', FALSE)
+            ->select('COUNT(DISTINCT p.id) AS property_count', FALSE)
+            ->select('GROUP_CONCAT(DISTINCT p.code ORDER BY p.code SEPARATOR ", ") AS property_codes', FALSE)
+            ->select('GROUP_CONCAT(DISTINCT p.property_type ORDER BY p.property_type SEPARATOR ", ") AS property_types', FALSE)
+            ->from('gh_room_types rt')
+            ->join('gh_rooms r', 'r.room_type_id = rt.id', 'left')
+            ->join('gh_properties p', 'p.id = r.property_id', 'left');
+
+        $this->apply_room_type_filters($filters);
+
         return $this->db
-            ->order_by('name', 'ASC')
-            ->get('gh_room_types')
+            ->group_by('rt.id')
+            ->order_by('rt.name', 'ASC')
+            ->get()
             ->result_array();
     }
 
@@ -109,13 +125,17 @@ class Master_model extends CI_Model
             ->update('gh_room_types', array('is_active' => 0));
     }
 
-    public function get_rooms()
+    public function get_rooms(array $filters = array())
     {
-        return $this->db
+        $this->db
             ->select('r.*, p.code AS property_code, rt.name AS type_name')
             ->from('gh_rooms r')
             ->join('gh_properties p', 'p.id = r.property_id', 'left')
-            ->join('gh_room_types rt', 'rt.id = r.room_type_id', 'left')
+            ->join('gh_room_types rt', 'rt.id = r.room_type_id', 'left');
+
+        $this->apply_room_filters($filters);
+
+        return $this->db
             ->order_by('p.code', 'ASC')
             ->order_by('r.room_code', 'ASC')
             ->get()
@@ -215,16 +235,20 @@ class Master_model extends CI_Model
             ->result_array();
     }
 
-    public function get_tenant_stays()
+    public function get_tenant_stays(array $filters = array())
     {
-        return $this->db
+        $this->db
             ->select('s.*, t.fullname, t.birth_place_date, t.religion, t.identity_number, t.phone, t.marital_status, t.occupation, t.address, ec.contact_name, ec.relationship, ec.phone AS emergency_phone, r.room_code, r.room_name, r.room_label, r.status AS room_status, r.is_public, p.code AS property_code, rt.name AS type_name')
             ->from('gh_tenant_stays s')
             ->join('gh_tenants t', 't.id = s.tenant_id', 'left')
             ->join('gh_tenant_emergency_contacts ec', 'ec.tenant_id = t.id', 'left')
             ->join('gh_rooms r', 'r.id = s.room_id', 'left')
             ->join('gh_properties p', 'p.id = r.property_id', 'left')
-            ->join('gh_room_types rt', 'rt.id = r.room_type_id', 'left')
+            ->join('gh_room_types rt', 'rt.id = r.room_type_id', 'left');
+
+        $this->apply_tenant_filters($filters);
+
+        return $this->db
             ->order_by("FIELD(s.stay_status, 'active', 'reserved', 'internal', 'empty', 'ended')", '', FALSE)
             ->order_by('p.code', 'ASC')
             ->order_by('r.room_code', 'ASC')
@@ -564,12 +588,129 @@ class Master_model extends CI_Model
             $this->db->where('rb.bill_status', $filters['status']);
         }
 
+        if (isset($filters['has_payment']) && $filters['has_payment'] === '1') {
+            $this->db->where('EXISTS (SELECT 1 FROM gh_payments ghp WHERE ghp.room_bill_id = rb.id)', null, FALSE);
+        }
+
         if (! empty($filters['q'])) {
             $q = $filters['q'];
             $this->db->group_start()
                 ->like('r.room_label', $q)
                 ->or_like('rb.tenant_name_snapshot', $q)
                 ->or_like('rb.tenant_phone_snapshot', $q)
+                ->group_end();
+        }
+    }
+
+    private function apply_property_filters(array $filters)
+    {
+        if (! empty($filters['type']) && in_array($filters['type'], array('house', 'apartment', 'other'), TRUE)) {
+            $this->db->where('property_type', $filters['type']);
+        }
+
+        if (isset($filters['status']) && $filters['status'] === 'active') {
+            $this->db->where('is_active', 1);
+        } elseif (isset($filters['status']) && $filters['status'] === 'inactive') {
+            $this->db->where('is_active', 0);
+        }
+
+        if (! empty($filters['q'])) {
+            $q = $filters['q'];
+            $this->db->group_start()
+                ->like('code', $q)
+                ->or_like('name', $q)
+                ->or_like('address', $q)
+                ->group_end();
+        }
+    }
+
+    private function apply_room_type_filters(array $filters)
+    {
+        if (! empty($filters['property_type']) && in_array($filters['property_type'], array('house', 'apartment', 'other'), TRUE)) {
+            $this->db->where('p.property_type', $filters['property_type']);
+        }
+
+        if (isset($filters['status']) && $filters['status'] === 'active') {
+            $this->db->where('rt.is_active', 1);
+        } elseif (isset($filters['status']) && $filters['status'] === 'inactive') {
+            $this->db->where('rt.is_active', 0);
+        }
+
+        if (! empty($filters['q'])) {
+            $q = $filters['q'];
+            $this->db->group_start()
+                ->like('rt.name', $q)
+                ->or_like('rt.description', $q)
+                ->or_like('p.code', $q)
+                ->group_end();
+        }
+
+        if (isset($filters['usage']) && $filters['usage'] === 'used') {
+            $this->db->having('room_count >', 0);
+        }
+    }
+
+    private function apply_room_filters(array $filters)
+    {
+        if (! empty($filters['property_id'])) {
+            $this->db->where('r.property_id', (int) $filters['property_id']);
+        }
+
+        if (! empty($filters['room_type_id'])) {
+            $this->db->where('r.room_type_id', (int) $filters['room_type_id']);
+        }
+
+        if (! empty($filters['status']) && in_array($filters['status'], array('available', 'occupied', 'reserved', 'maintenance', 'mess', 'inactive'), TRUE)) {
+            $this->db->where('r.status', $filters['status']);
+        }
+
+        if (isset($filters['public']) && $filters['public'] === 'public') {
+            $this->db->where('r.is_public', 1);
+        } elseif (isset($filters['public']) && $filters['public'] === 'hidden') {
+            $this->db->where('r.is_public', 0);
+        }
+
+        if (! empty($filters['q'])) {
+            $q = $filters['q'];
+            $this->db->group_start()
+                ->like('r.room_code', $q)
+                ->or_like('r.room_name', $q)
+                ->or_like('r.room_label', $q)
+                ->or_like('p.code', $q)
+                ->or_like('rt.name', $q)
+                ->group_end();
+        }
+    }
+
+    private function apply_tenant_filters(array $filters)
+    {
+        if (! empty($filters['property_id'])) {
+            $this->db->where('r.property_id', (int) $filters['property_id']);
+        }
+
+        if (! empty($filters['room_type_id'])) {
+            $this->db->where('r.room_type_id', (int) $filters['room_type_id']);
+        }
+
+        if (! empty($filters['room_id'])) {
+            $this->db->where('s.room_id', (int) $filters['room_id']);
+        }
+
+        if (! empty($filters['stay_status']) && in_array($filters['stay_status'], array('active', 'reserved', 'ended', 'internal', 'empty'), TRUE)) {
+            $this->db->where('s.stay_status', $filters['stay_status']);
+        }
+
+        if (! empty($filters['q'])) {
+            $q = $filters['q'];
+            $this->db->group_start()
+                ->like('t.fullname', $q)
+                ->or_like('t.phone', $q)
+                ->or_like('t.identity_number', $q)
+                ->or_like('s.source_unit_name', $q)
+                ->or_like('s.notes', $q)
+                ->or_like('r.room_label', $q)
+                ->or_like('r.room_code', $q)
+                ->or_like('p.code', $q)
                 ->group_end();
         }
     }
