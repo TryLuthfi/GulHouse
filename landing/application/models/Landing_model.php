@@ -3,6 +3,15 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Landing_model extends CI_Model
 {
+    private $booking_error = '';
+    private $booking_error_field = '';
+
+    public function get_booking_error() { return $this->booking_error; }
+    public function get_booking_error_field() { return $this->booking_error_field; }
+    private function booking_rejected($field,$message)
+    {
+        $this->booking_error_field=$field;$this->booking_error=$message;return FALSE;
+    }
     public function get_summary()
     {
         $fallback = array(
@@ -21,11 +30,15 @@ class Landing_model extends CI_Model
                 ->get('gh_rooms')
                 ->row_array();
 
+            $total = (int) $row['total_rooms'];
+            $available = (int) $row['available_rooms'];
+            $occupied = max(0, $total - $available);
+
             return array(
-                'total_rooms' => (int) $row['total_rooms'],
-                'available_rooms' => (int) $row['available_rooms'],
-                'occupied_rooms' => 0,
-                'occupancy_rate' => 0,
+                'total_rooms' => $total,
+                'available_rooms' => $available,
+                'occupied_rooms' => $occupied,
+                'occupancy_rate' => $total > 0 ? round(($occupied / $total) * 100) : 0,
                 'starting_price' => isset($row['starting_price']) ? (int) $row['starting_price'] : $fallback['starting_price'],
             );
         }
@@ -38,11 +51,15 @@ class Landing_model extends CI_Model
                 ->get('gh_room_database')
                 ->row_array();
 
+            $total = (int) $row['total_rooms'];
+            $available = (int) $row['available_rooms'];
+            $occupied = max(0, $total - $available);
+
             return array(
-                'total_rooms' => (int) $row['total_rooms'],
-                'available_rooms' => (int) $row['available_rooms'],
-                'occupied_rooms' => 0,
-                'occupancy_rate' => 0,
+                'total_rooms' => $total,
+                'available_rooms' => $available,
+                'occupied_rooms' => $occupied,
+                'occupancy_rate' => $total > 0 ? round(($occupied / $total) * 100) : 0,
                 'starting_price' => isset($row['starting_price']) ? (int) $row['starting_price'] : $fallback['starting_price'],
             );
         }
@@ -211,10 +228,21 @@ class Landing_model extends CI_Model
     {
         return array(
             array('label' => 'Sewa bulanan', 'value' => 'Mulai Rp 1.500.000'),
-            array('label' => 'Deposit', 'value' => 'Umumnya 1x sewa'),
-            array('label' => 'Biaya tambahan', 'value' => 'Sesuai fasilitas kamar'),
+            array('label' => 'Deposit', 'value' => 'Rp. 500.000'),
             array('label' => 'Survey', 'value' => 'By appointment'),
         );
+    }
+
+    public function get_house_rules_document()
+    {
+        if (! $this->table_exists('gh_document_templates')) return NULL;
+        $template = $this->db->where('template_key', 'house_rules')->where('is_active', 1)
+            ->get('gh_document_templates')->row_array();
+        if (! $template) return NULL;
+        // Only this public template is exposed; use the same attachment as master.
+        $template['pdf_path'] = dirname(rtrim(FCPATH, '/\\')) . '/master/application/private_documents/template_'
+            . substr(hash('sha256', $this->db->database), 0, 16) . '_' . (int) $template['id'] . '.pdf';
+        return $template;
     }
 
     public function get_house_rules()
@@ -424,18 +452,7 @@ class Landing_model extends CI_Model
 
     public function get_room_gallery(array $room)
     {
-        $uploadedGallery = $this->get_uploaded_room_gallery($room);
-
-        if ($uploadedGallery) {
-            return $uploadedGallery;
-        }
-
-        $masterPreview = $this->get_preview_photos(8);
-        if ($masterPreview) {
-            return $masterPreview;
-        }
-
-        return $this->fallback_preview_photos(8, $room['name']);
+        return $this->get_uploaded_room_gallery($room);
     }
 
     public function get_preview_photos($limit = 4)
@@ -497,7 +514,39 @@ class Landing_model extends CI_Model
             return $leftScore - $rightScore;
         });
 
-        return $photos ? array_slice($photos, 0, $limit) : $this->fallback_preview_photos($limit);
+        return $photos ? $this->select_diverse_preview_photos($photos, $limit) : $this->fallback_preview_photos($limit);
+    }
+
+    private function select_diverse_preview_photos(array $photos, $limit)
+    {
+        $picked = array();
+        $usedKeys = array();
+        $usedIndexes = array();
+
+        foreach ($photos as $index => $photo) {
+            $key = isset($photo['category']) ? strtolower($photo['category']) : 'foto';
+            if (isset($usedKeys[$key])) {
+                continue;
+            }
+            $picked[] = $photo;
+            $usedKeys[$key] = TRUE;
+            $usedIndexes[$index] = TRUE;
+            if (count($picked) >= $limit) {
+                return $picked;
+            }
+        }
+
+        foreach ($photos as $index => $photo) {
+            if (isset($usedIndexes[$index])) {
+                continue;
+            }
+            $picked[] = $photo;
+            if (count($picked) >= $limit) {
+                break;
+            }
+        }
+
+        return array_slice($picked, 0, $limit);
     }
 
     private function fallback_preview_photos($limit = 4, $roomName = 'GUL HOUSE')
@@ -684,16 +733,43 @@ class Landing_model extends CI_Model
 
     public function save_booking_request(array $payload)
     {
-        if ($payload['fullname'] === '' || $payload['phone'] === '') {
-            return FALSE;
+        $this->booking_error='';$this->booking_error_field='';
+        foreach(array('fullname','phone','room_interest','move_in_plan','message') as $field)$payload[$field]=isset($payload[$field])&&is_scalar($payload[$field])?trim((string)$payload[$field]):'';
+        if($payload['fullname']==='')return $this->booking_rejected('fullname','Isi nama lengkap terlebih dahulu.');
+        if(mb_strlen($payload['fullname'])>150)return $this->booking_rejected('fullname','Nama lengkap maksimal 150 karakter.');
+        if($payload['phone']==='')return $this->booking_rejected('phone','Isi nomor WhatsApp terlebih dahulu.');
+        if(!preg_match('/^[0-9]{9,15}$/D',$payload['phone']))return $this->booking_rejected('phone','Nomor WhatsApp hanya boleh berisi angka sebanyak 9–15 digit, tanpa tanda +, spasi, atau tanda baca.');
+        if($payload['room_interest']==='')return $this->booking_rejected('room_interest','Pilih minat kamar terlebih dahulu.');
+        if($payload['move_in_plan']!=='') {
+            if(!preg_match('/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/D',$payload['move_in_plan'],$date) || !checkdate((int)$date[2],(int)$date[3],(int)$date[1]))return $this->booking_rejected('move_in_plan','Estimasi mulai tinggal harus berupa tanggal yang valid dengan format YYYY-MM-DD.');
+            $today=(new DateTimeImmutable('now',new DateTimeZone('Asia/Jakarta')))->format('Y-m-d');
+            if($payload['move_in_plan']<$today)return $this->booking_rejected('move_in_plan','Estimasi mulai tinggal tidak boleh sebelum hari ini (WIB).');
         }
+        if(mb_strlen($payload['message'])>2000)return $this->booking_rejected('message','Catatan maksimal 2.000 karakter.');
+
+        try {
+        $selected = null;
+        foreach ($this->get_all_public_rooms() as $room) {
+            if ($room['name'] === $payload['room_interest']) { $selected = $room; break; }
+        }
+        if(!$selected)return $this->booking_rejected('room_interest','Pilihan kamar tidak ditemukan. Muat ulang halaman lalu pilih tipe kamar yang tersedia.');
+        if(empty($selected['available_count']))return $this->booking_rejected('room_interest','Tipe kamar yang dipilih sedang penuh atau tidak tersedia. Pilih tipe lain atau hubungi GUL HOUSE.');
 
         $this->ensure_booking_table();
         if ( ! $this->table_exists('gh_booking_requests')) {
-            return FALSE;
+            return $this->booking_rejected('form','Layanan booking belum tersedia. Silakan coba lagi atau hubungi GUL HOUSE.');
         }
 
-        return $this->db->insert('gh_booking_requests', array(
+        // Repeated browser submissions create one lead; room assignment happens atomically in master.
+        // Archived leads are history: a new request must remain visible in the active master list.
+        if ($this->db->field_exists('archived_at', 'gh_booking_requests')) $this->db->where('archived_at', NULL);
+        $duplicate = $this->db->where('phone', $payload['phone'])
+            ->where('fullname', $payload['fullname'])->where('room_interest', $payload['room_interest'])
+            ->where_in('status', array('new', 'contacted', 'survey'))
+            ->where('created_at >=', date('Y-m-d H:i:s', time() - 300))
+            ->get('gh_booking_requests')->row_array();
+        if ($duplicate) return TRUE;
+        $saved=$this->db->insert('gh_booking_requests', array(
             'fullname' => $payload['fullname'],
             'phone' => $payload['phone'],
             'room_interest' => $payload['room_interest'],
@@ -703,6 +779,12 @@ class Landing_model extends CI_Model
             'status' => 'new',
             'created_at' => date('Y-m-d H:i:s'),
         ));
+        if(!$saved)return $this->booking_rejected('form','Permintaan belum dapat disimpan ke database. Coba lagi atau hubungi GUL HOUSE.');
+        return TRUE;
+        }catch(Throwable $e){
+            // Never disclose or log the SQL, payload, phone, or exception contents.
+            return $this->booking_rejected('form','Permintaan belum dapat disimpan ke database. Coba lagi atau hubungi GUL HOUSE.');
+        }
     }
 
     private function ensure_booking_table()
@@ -719,7 +801,7 @@ class Landing_model extends CI_Model
             `move_in_plan` VARCHAR(60) DEFAULT NULL,
             `message` TEXT DEFAULT NULL,
             `source` VARCHAR(40) NOT NULL DEFAULT 'landing',
-            `status` ENUM('new','contacted','survey','converted','cancelled') NOT NULL DEFAULT 'new',
+            `status` ENUM('new','contacted','survey','converted','cancelled','done') NOT NULL DEFAULT 'new',
             `created_at` DATETIME NOT NULL,
             `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
@@ -755,7 +837,6 @@ class Landing_model extends CI_Model
             ->where('RIGHT(t.identity_number, 4) = ' . $this->db->escape($nikLast4), null, FALSE)
             ->order_by('s.stay_status', 'ASC')
             ->order_by('s.id', 'DESC')
-            ->limit(12)
             ->get()
             ->result_array();
 
@@ -855,19 +936,48 @@ class Landing_model extends CI_Model
             ->join('gh_billing_periods bp', 'bp.id = rb.period_id')
             ->where('rb.room_id', (int) $context['room_id']);
 
-        if (! empty($context['tenant_id']) || ! empty($context['phone']) || ! empty($context['fullname'])) {
-            $this->db->group_start();
-            $this->db->where('rb.tenant_id', (int) $context['tenant_id']);
-            if (! empty($context['phone'])) {
-                $this->db->or_where('rb.tenant_phone_snapshot', $context['phone']);
-            }
-            if (! empty($context['fullname'])) {
-                $this->db->or_where('rb.tenant_name_snapshot', $context['fullname']);
-            }
-            $this->db->group_end();
-        }
+        // A shared name or phone must never grant another occupant's invoices.
+        $this->db->where('rb.tenant_id', (int) $context['tenant_id']);
 
         return $this->db;
+    }
+
+    public function get_resident_portal(array $context)
+    {
+        $tenantId = (int) $context['tenant_id'];
+        $stayId = (int) $context['stay_id'];
+        $contracts = $this->db->where('tenant_id', $tenantId)->where('stay_id', $stayId)
+            ->order_by('start_date', 'DESC')->get('gh_contracts')->result_array();
+        $documents = $this->db->select('document_type, document_title, status')
+            ->where('tenant_id', $tenantId)->get('gh_contract_documents')->result_array();
+        $deposits = $this->db->select('transaction_type, amount, transaction_date, description')
+            ->where('tenant_id', $tenantId)->where('stay_id', $stayId)
+            ->order_by('id', 'DESC')->get('gh_deposit_transactions')->result_array();
+        $balance = 0;
+        foreach ($deposits as $item) $balance += in_array($item['transaction_type'], array('received','adjustment')) ? (int)$item['amount'] : -(int)$item['amount'];
+        $complaints = $this->db->where('tenant_id', $tenantId)->where('room_id', (int)$context['room_id'])
+            ->order_by('id', 'DESC')->limit(20)->get('gh_complaints')->result_array();
+        return array('contracts'=>$contracts,'documents'=>$documents,'deposit_balance'=>$balance,'complaints'=>$complaints);
+    }
+
+    public function submit_resident_complaint(array $context, array $payload)
+    {
+        $title = trim((string)($payload['complaint_title'] ?? ''));
+        $detail = trim((string)($payload['complaint_detail'] ?? ''));
+        $category = $payload['category'] ?? 'other';
+        if ($title === '' || mb_strlen($title)>180 || mb_strlen($detail)>3000 ||
+            !in_array($category,array('facility','noise','billing','security','cleanliness','other'))) return FALSE;
+        $duplicate = $this->db->where('tenant_id',(int)$context['tenant_id'])
+            ->where('room_id',(int)$context['room_id'])->where('complaint_title',$title)
+            ->where('status','open')->where('created_at >=',date('Y-m-d H:i:s',time()-300))
+            ->get('gh_complaints')->row_array();
+        if ($duplicate) return TRUE;
+        return $this->db->insert('gh_complaints',array(
+            'ticket_no'=>'GH-C-' . date('Ymd') . '-' . bin2hex(random_bytes(4)),
+            'tenant_id'=>(int)$context['tenant_id'],'room_id'=>(int)$context['room_id'],
+            'complaint_title'=>$title,'complaint_detail'=>$detail,'category'=>$category,
+            'status'=>'open','reported_at'=>date('Y-m-d'),
+        ));
     }
 
     private function get_payment_period()
@@ -877,6 +987,12 @@ class Landing_model extends CI_Model
         }
 
         $current = date('Y-m');
+        $selected = trim((string) $this->input->get('period', TRUE));
+        if (preg_match('/^(\d{4})-(\d{2})$/D', $selected, $parts) && checkdate((int)$parts[2], 1, (int)$parts[1])) {
+            $period = $this->db->where('period_key', $selected)->get('gh_billing_periods')->row_array();
+            if ($period) return $period;
+            return array('id'=>0,'period_key'=>$selected,'period_label'=>strtoupper(date('F Y',strtotime($selected.'-01'))));
+        }
         $row = $this->db
             ->where('period_key', $current)
             ->get('gh_billing_periods')
@@ -886,16 +1002,19 @@ class Landing_model extends CI_Model
             return $row;
         }
 
-        return $this->db
+        $past = $this->db->where('period_key <=', $current)
             ->order_by('period_key', 'DESC')
             ->limit(1)
             ->get('gh_billing_periods')
             ->row_array();
+        if ($past) return $past;
+        return $this->db->order_by('period_key', 'ASC')->limit(1)->get('gh_billing_periods')->row_array();
     }
 
     private function draft_payment_bill(array $context, $period = null)
     {
-        $amount = (int) ($context['stay_price'] ? $context['stay_price'] : $context['room_price']);
+        // An estimate is not an issued invoice, especially for a reserved stay.
+        $amount = 0;
 
         return array(
             'id' => null,
@@ -921,10 +1040,6 @@ class Landing_model extends CI_Model
         $deposit = (int) $bill['deposit_amount'];
         $paid = (int) $bill['paid_total'];
         $target = max($base, 0);
-
-        if ($target === 0 && $deposit > 0) {
-            $target = $deposit;
-        }
 
         $bill['remaining_amount'] = max(0, $target - $paid);
         $bill['is_draft'] = FALSE;
@@ -958,7 +1073,9 @@ class Landing_model extends CI_Model
             return TRUE;
         }
 
-        return substr($storedDigits, -8) === substr($inputDigits, -8);
+        if (strpos($storedDigits, '62') === 0) $storedDigits = '0' . substr($storedDigits, 2);
+        if (strpos($inputDigits, '62') === 0) $inputDigits = '0' . substr($inputDigits, 2);
+        return $storedDigits === $inputDigits;
     }
 
     private function only_digits($value)
@@ -1062,8 +1179,11 @@ class Landing_model extends CI_Model
 
     private function get_public_master_room_type_cards()
     {
+        $citySelect=$this->db->field_exists('city','gh_properties')?'MAX(p.city) AS city':'"" AS city';
+        $addressSelect=$this->db->field_exists('address','gh_properties')?'MAX(p.address) AS property_address':'"" AS property_address';
         $rows = $this->db
             ->select('p.code AS property_code', FALSE)
+            ->select($citySelect,FALSE)->select($addressSelect,FALSE)
             ->select('rt.name AS type_name', FALSE)
             ->select('SUM(CASE WHEN r.monthly_price IS NOT NULL AND r.status NOT IN ("inactive", "mess") THEN 1 ELSE 0 END) AS total_rooms', FALSE)
             ->select('SUM(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN 1 ELSE 0 END) AS available_count', FALSE)
@@ -1085,6 +1205,8 @@ class Landing_model extends CI_Model
         foreach ($rows as $index => $row) {
             $cards[] = array(
                 'id' => $index + 1,
+                'city' => $this->public_property_city($row['property_code'],$row['city'],$row['property_address']),
+                'property_address' => trim((string)$row['property_address']),
                 'code' => $row['property_code'],
                 'name' => $row['property_code'] . ' - ' . $row['type_name'],
                 'slug' => $this->create_public_room_slug($row['property_code'], $row['type_name']),
@@ -1100,6 +1222,16 @@ class Landing_model extends CI_Model
         }
 
         return $cards ? $cards : $this->fallback_public_room_type_cards();
+    }
+
+    private function public_property_city($code,$city,$address)
+    {
+        if(trim((string)$city)!=='')return trim((string)$city);
+        if(preg_match('/\b(?:Kota|Kabupaten)\s+([^,;\r\n]+?)(?=\s+[0-9]{5}\b|[,;\r\n]|$)/iu',(string)$address,$match))return mb_convert_case(trim($match[1]),MB_CASE_TITLE,'UTF-8');
+        // Verified existing landing map addresses for GH 1/GH 2; never infer an unknown apartment city.
+        $verified=array('GH1'=>'Jakarta Barat','GH2'=>'Jakarta Barat');
+        $key=preg_replace('/[^A-Z0-9]/','',strtoupper((string)$code));
+        return $verified[$key]??'';
     }
 
     private function fallback_public_room_type_cards()

@@ -1,0 +1,20 @@
+--- a/master/application/hooks/Security_hook.php
++++ b/master/application/hooks/Security_hook.php
+@@ -33,6 +33,9 @@ class Security_hook
+             $write = ! in_array($method, array('index', 'export', 'print_contract', 'print_template', 'print_receipt', 'download_document'), TRUE);
+         }
+         if ($controller === 'users') { $write = $method !== 'index'; }
++        if ($controller === 'paymentproofs') {
++            $write = ! in_array($method, array('index', 'download'), TRUE);
++        }
+         if ($write && $ci->input->method(TRUE) !== 'POST') {
+             header('Allow: POST');
+             show_error('Aksi ini memerlukan POST dengan token keamanan. Muat ulang halaman lalu gunakan tombol aksi.', 405, 'Metode tidak diizinkan');
+@@ -42,6 +45,7 @@ class Security_hook
+             return;
+         }
+         $module = $controller;
++        if ($controller === 'paymentproofs') { $module = 'payments'; }
+         if ($controller === 'operations') {
+             $module = (string) $ci->uri->rsegment(3);
+             $special = array('convert_booking' => 'bookings', 'generate_billing' => 'billing',

@@ -10,7 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="preload" as="image" href="<?= base_url('index.php/media/logo'); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20260909-gallery'); ?>">
+    <link rel="preload" as="script" href="<?= base_url('assets/landing/js/landing.js?v=20261020-survey-update'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20261020-survey-update'); ?>">
 </head>
 <body class="detail-page">
     <header class="site-header" id="top">
@@ -22,10 +23,10 @@
             <a href="<?= base_url('#rooms'); ?>">Kamar</a>
             <a href="<?= base_url('#facilities'); ?>">Fasilitas</a>
             <a href="#costs">Biaya</a>
-            <a href="<?= base_url('#booking'); ?>">Booking</a>
+            <?php if ((int) $room['available_count'] > 0): ?><a href="<?= base_url('#booking'); ?>">Booking</a><?php endif; ?>
             <a href="<?= base_url('#contact'); ?>">Kontak</a>
         </nav>
-        <a class="header-action" href="<?= base_url('#booking'); ?>">Cek Kamar</a>
+        <?php if ((int) $room['available_count'] > 0): ?><a class="header-action" href="<?= base_url('#booking'); ?>">Survey Kamar</a><?php endif; ?>
     </header>
 
     <div class="detail-sticky-bar" data-detail-sticky aria-hidden="true">
@@ -36,7 +37,7 @@
         <div>
             <span><?= (int) $room['available_count']; ?> tersedia</span>
             <strong><?= html_escape($room['price_label']); ?></strong>
-            <a href="<?= base_url('#booking'); ?>">Booking</a>
+            <?php if ((int) $room['available_count'] > 0): ?><a href="<?= base_url('#booking'); ?>">Booking</a><?php endif; ?>
         </div>
     </div>
 
@@ -52,23 +53,32 @@
                 <span><?= (int) $room['available_count']; ?> tersedia dari <?= (int) $room['total_rooms']; ?> kamar</span>
                 <strong><?= html_escape($room['price_label']); ?></strong>
                 <p>Estimasi deposit Rp <?= number_format((int) $room['deposit_estimate'], 0, ',', '.'); ?></p>
-                <a class="btn btn-primary glow-button" href="<?= base_url('#booking'); ?>">Booking Survey</a>
+                <?php if ((int) $room['available_count'] > 0): ?><a class="btn btn-primary glow-button" href="<?= base_url('#booking'); ?>">Booking Survey</a><?php else: ?><p class="room-stock-empty">Kamar penuh. Booking belum tersedia untuk tipe ini.</p><?php endif; ?>
             </aside>
         </section>
 
+        <?php if (! empty($gallery)): ?>
         <section class="detail-gallery reveal" data-gallery>
-            <button type="button" class="gallery-main" data-gallery-open="0">
+            <button type="button" class="gallery-main" data-gallery-open="0" disabled>
                 <img src="<?= html_escape($gallery[0]['src']); ?>" alt="<?= html_escape($gallery[0]['title']); ?>">
                 <span>Lihat semua foto (<?= count($gallery); ?>)</span>
             </button>
             <div class="gallery-side">
                 <?php foreach (array_slice($gallery, 1, 4) as $index => $photo): ?>
-                    <button type="button" data-gallery-open="<?= $index + 1; ?>">
+                    <button type="button" data-gallery-open="<?= $index + 1; ?>" disabled>
                         <img src="<?= html_escape($photo['src']); ?>" alt="<?= html_escape($photo['title']); ?>">
                     </button>
                 <?php endforeach; ?>
             </div>
         </section>
+        <?php else: ?>
+        <section class="detail-gallery reveal" aria-label="Foto kamar">
+            <div class="gallery-empty">
+                <h2>Foto belum tersedia</h2>
+                <p>Foto untuk tipe kamar di gedung ini belum diunggah. Hubungi pengelola untuk menjadwalkan survey.</p>
+            </div>
+        </section>
+        <?php endif; ?>
 
         <section class="section detail-content">
             <article class="detail-copy reveal">
@@ -137,11 +147,11 @@
                 </div>
                 <div class="accordion-item">
                     <button type="button" class="accordion-trigger" aria-expanded="false">
-                        Apakah foto akan memakai foto asli per tipe?
+                        Foto kamar mana yang ditampilkan?
                         <span></span>
                     </button>
                     <div class="accordion-panel">
-                        <p>Struktur galeri sudah siap. Foto contoh ini bisa diganti dari upload master per gedung, tipe, atau kamar saat modul admin dibuat.</p>
+                        <p>Galeri menampilkan foto yang diunggah untuk tipe kamar di gedung ini. Jika belum ada, halaman menampilkan keterangan Foto belum tersedia. Hubungi pengelola untuk melihat kondisi kamar saat survey.</p>
                     </div>
                 </div>
                 <div class="accordion-item">
@@ -150,7 +160,7 @@
                         <span></span>
                     </button>
                     <div class="accordion-panel">
-                        <p>Tekan tombol Booking Survey, isi nama dan WhatsApp, lalu pengelola akan menghubungi untuk konfirmasi jadwal.</p>
+                        <p><?= (int) $room['available_count'] > 0 ? 'Tekan tombol Booking Survey, isi nama dan WhatsApp, lalu pengelola akan menghubungi untuk konfirmasi jadwal.' : 'Tipe kamar ini sedang penuh sehingga booking belum tersedia. Lihat pilihan kamar lain atau hubungi pengelola untuk informasi ketersediaan.'; ?></p>
                     </div>
                 </div>
             </div>
@@ -167,10 +177,10 @@
                 <?php foreach ($similar_rooms as $index => $similar): ?>
                     <article class="room-card">
                         <div
-                            class="room-photo photo-<?= ($index % 3) + 1; ?>"
+                            class="room-photo<?= empty($similar['cover_image']) ? ' room-photo-empty' : ''; ?>"
                             <?php if (! empty($similar['cover_image'])): ?>
                                 style="background-image: url('<?= html_escape($similar['cover_image']); ?>');"
-                            <?php endif; ?>></div>
+                            <?php endif; ?>><?php if (empty($similar['cover_image'])): ?><span>Foto belum tersedia</span><?php endif; ?></div>
                         <div class="room-body">
                             <span><?= html_escape($similar['code']); ?></span>
                             <h3><?= html_escape($similar['name']); ?></h3>
@@ -183,6 +193,7 @@
         </section>
     </main>
 
+    <?php if (! empty($gallery)): ?>
     <div class="photo-modal" data-photo-modal aria-hidden="true">
         <div class="photo-modal-backdrop" data-photo-close></div>
         <div class="photo-modal-shell" role="dialog" aria-modal="true" aria-label="Preview foto kamar">
@@ -205,15 +216,16 @@
             <div class="photo-thumbs" data-photo-thumbs></div>
         </div>
     </div>
+    <?php endif; ?>
 
     <div class="sticky-cta">
-        <a href="https://wa.me/6280000000000" target="_blank" rel="noopener">WhatsApp</a>
-        <a href="<?= base_url('#booking'); ?>">Booking</a>
+        <a href="<?= html_escape(gh_contact_url()); ?>" target="_blank" rel="noopener"><?= html_escape(gh_contact_label()); ?></a>
+        <?php if ((int) $room['available_count'] > 0): ?><a href="<?= base_url('#booking'); ?>">Booking</a><?php endif; ?>
     </div>
 
     <script>
         window.GH_ROOM_GALLERY = <?= json_encode($gallery); ?>;
     </script>
-    <script src="<?= base_url('assets/landing/js/landing.js?v=20260909-gallery'); ?>"></script>
+    <script src="<?= base_url('assets/landing/js/landing.js?v=20261020-survey-update'); ?>"></script>
 </body>
 </html>

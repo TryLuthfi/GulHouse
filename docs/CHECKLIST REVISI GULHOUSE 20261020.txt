@@ -1,0 +1,118 @@
+CHECKLIST REVISI GULHOUSE - 20 OKTOBER 2026
+Lingkungan: lokal D:/XAMPP/htdocs/GulHouse. Belum deploy online.
+Status: selesai di lokal; QC independen PASS pada cakupan revisi ini.
+
+1. MASTER BOOKING
+[x] Follow-up diganti Simpan Data; dropdown dan tombol tabel dirapikan.
+[x] Convert diganti Tandai Selesai; aksi lama juga hanya menyimpan Done.
+[x] Penyelesaian booking tidak membuat penghuni/reservasi/kontrak/tagihan.
+[x] Riwayat booking hasil konversi lama dan relasinya dipertahankan.
+[x] Tombol WhatsApp per baris: 08, +62 dan +6208 dinormalisasi untuk wa.me.
+[x] Nomor yang tersimpan tidak diubah dan pesan tidak dikirim otomatis.
+
+2. JALUR PENDAFTARAN
+[x] Booking survey ditutup setelah deal, lalu calon penghuni mendaftar.
+[x] Calon penghuni datang langsung dapat mendaftar tanpa booking survey.
+[x] Reservasi dan administrasi dibuat dari Siklus Penghuni setelah verifikasi.
+[x] Penautan masa tinggal existing tidak mengadopsi identitas dari HP saja.
+
+3. FORM DAFTAR PENGHUNI
+[x] Kolom Jalur Survey dihapus; sumber pendaftaran publik otomatis Website.
+[x] Upload KTP dan buku nikah dirapikan, nama file dan pratinjau ditampilkan.
+[x] KTP tetap wajib, buku nikah opsional; berkas disimpan privat.
+
+4. RESERVASI DAN PERIODE
+[x] Batas periode awal satu bulan kalender mengikuti tanggal mulai sewa.
+[x] Tanggal 29-31 menyesuaikan akhir bulan lalu kembali ke tanggal awal.
+[x] Batas periode awal dapat diubah; tidak berarti checkout otomatis.
+[x] Harga dan deposit mengambil master kamar; tidak dapat diubah di form.
+[x] Server mengabaikan manipulasi harga/deposit dari kiriman formulir.
+[x] Nilai kesepakatan lama tetap ketika master harga kemudian berubah.
+[x] Dropdown masa tinggal hanya berisi hubungan yang memenuhi syarat;
+    kondisi kosong dijelaskan dan tidak menghalangi pembuatan reservasi baru.
+[x] Okupansi bulanan tetap terlindungi setelah batas periode pertama.
+
+5. GANTI KAMAR SEBELUM CHECK-IN
+[x] Ganti pilihan kamar sebelum reservasi atau pindahkan reservasi yang ada.
+[x] Ketersediaan dan bentrok tanggal diperiksa kembali dalam transaksi.
+[x] Identitas, reservasi, kontrak draft dan tagihan tetap memakai ID yang sama.
+[x] Pembayaran dan ledger deposit tetap; selisih kurang/lebih bayar terlihat.
+[x] Kenaikan yang belum lunas membatalkan verifikasi pembayaran yang usang.
+[x] Tidak membuat refund, pembayaran, atau pemotongan deposit fiktif.
+[x] Perubahan diblokir jika sudah check-in, ada bukti pemeriksaan/dokumen
+    yang perlu ditinjau, atau tagihan tidak aman dipindahkan otomatis.
+
+6. TAMPILAN RESPONSIF
+[x] Nama file privat panjang membungkus dan tombol Lihat tetap satu baris.
+[x] Form, tombol, upload dan tabel diperiksa pada 390/768/1280 px.
+[x] Portal penghuni 390/768/1280 px tidak meluber dan tidak memuat warning PHP.
+
+7. PEMBAYARAN, DENDA DAN TUNGGAKAN
+[x] Tenggat wajib lunas H-2 ditampilkan terpisah dari tanggal jatuh tempo.
+[x] Dua hari setelah jatuh tempo bebas denda; H+3 Rp100.000/hari.
+[x] Contoh: jatuh tempo 20 November, wajib lunas 18; denda 23=100.000,
+    24=200.000. Bukan bebas denda sampai H+4.
+[x] Perhitungan berhenti saat sewa lunas atau checkout aktual.
+[x] Pembayaran sebagian masih menyisakan kewajiban dan denda sesuai aturan.
+[x] Pembayaran denda dicatat terpisah, berotorisasi dan terlindung duplikasi.
+[x] Pendapatan denda disajikan terpisah dari pendapatan sewa.
+[x] H+7 memerlukan peninjauan take out admin, bukan pelepasan kamar otomatis.
+[x] Checkout tunggakan membutuhkan peninjauan tersimpan, pemeriksaan akhir,
+    pengembalian kunci dan konfirmasi bahwa piutang tetap tercatat.
+[x] Checkout biasa tetap memerlukan penyelesaian kewajiban.
+[x] Tidak ada perubahan biaya retroaktif pada tagihan historis saat migrasi.
+    Kebijakan otomatis dipakai pada reservasi baru setelah pembaruan.
+
+8. PORTAL, PAYMENT DAN PEMULIHAN AKSES
+[x] Login web memakai nomor HP/WhatsApp dan kode akses pribadi.
+[x] Payment dan portal memakai satu sesi; tidak meminta 4 digit NIK lagi.
+[x] Tagihan bulanan, transaksi dan layanan penghuni tersedia dalam portal.
+[x] Endpoint Payment lama tidak dapat membuat akses dari HP + NIK.
+[x] Super Admin dapat mereset kode setelah verifikasi identitas dan alasan.
+[x] Kode baru acak, tersimpan sebagai hash, ditampilkan hanya sekali.
+[x] Kode lama, sesi web lama serta token API terkait dibatalkan saat reset.
+[x] Reset mempertahankan riwayat penghuni, dokumen, reservasi dan transaksi.
+[x] Sumber dua layar login React Native diselaraskan; TypeScript lulus.
+    APK tidak dibangun ulang dan versi online belum diperbarui.
+
+VERIFIKASI DAN BATAS
+- WASP: booking20, lifecycle24, matematika kebijakan25, transaksi kebijakan28
+  pemeriksaan lulus pada data sintetis; beberapa cakupan saling berkaitan.
+- ZEYN: autentikasi17 pemeriksaan model lulus; tidak mereset penghuni asli.
+- CIKO: uji HTTP/browser independen pada data sintetis, termasuk role/CSRF,
+  nilai kiriman dimanipulasi, perubahan kamar, ledger, denda dan reset.
+  Dua temuan integrasi (path model bersama dan deprecation dependency DB)
+  diperbaiki di backend dan diverifikasi ulang melalui halaman publik serta
+  portal terautentikasi; tidak ditutupi menggunakan CSS atau suppress error.
+- Migrasi lokal: 40 tabel lama mempertahankan data/kolom bisnisnya;
+  tiga tabel kebijakan baru kosong saat migrasi. Backup dan receipt tersimpan.
+- Tidak mengirim WhatsApp, melakukan transfer nyata, menghapus data asli,
+  melakukan push/deploy online, atau membangun APK baru.
+- Laporan detail: docs/ciko-all-revisions-20261020.md dan
+  docs/wasp-all-revisions-policy-20261020.md.
+
+BERKAS UTAMA
+- Master: models/Operations_model.php, Lifecycle_model.php,
+  Billing_policy_model.php, Booking_retention_model.php, Mobile_service.php,
+  Resident_access_model.php; controllers/Operations.php, Lifecycle.php,
+  Access.php; config/routes.php; hooks/Security_hook.php;
+  helpers/booking_helper.php; libraries/Mobile_schema.php.
+- Tampilan master: views/operations/index.php dan views/lifecycle/;
+  assets/master/css/master.css, lifecycle.css dan js/lifecycle.js.
+- Landing: controllers/Home.php, Resident.php; models/Landing_model.php,
+  Resident_access_model.php; views/landing_home.php dan views/resident/;
+  assets/landing/css/lifecycle.css dan js/landing.js, lifecycle.js.
+- React Native: mobile/src/screens/Resident.tsx dan PaymentLookup.tsx.
+- SQL: patch_gulhouse_booking_done_20261020.sql dan
+  patch_gulhouse_rental_policy_20261020.sql pada folder database/.
+- Backup, receipt migrasi, bukti uji dan manifest sumber:
+  .e2e/all-revisions-20261020/ dan .e2e/portal-access-20261020/.
+
+CATATAN QC AKHIR
+- CIKO memisahkan hasil inti, kebijakan, autentikasi, dan pemeriksaan ulang;
+  tidak menjumlahkan semuanya menjadi klaim alur unik yang berlebihan.
+- Autentikasi: 17 assertion keamanan/flow lulus; satu kegagalan responsif
+  historis ditutup melalui 4 pemeriksaan GET setelah perbaikan backend.
+- Overlap okupansi bulanan setelah periode pertama: 3 pemeriksaan lulus.
+- Semua browser dan server PHP uji milik run sudah ditutup; Apache lokal
+  tetap aktif. Halaman akses/pendaftaran lokal HTTP200 tanpa diagnostik PHP.

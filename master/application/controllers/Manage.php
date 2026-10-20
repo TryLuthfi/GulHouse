@@ -1,5 +1,6 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
+require_once APPPATH.'libraries/Mobile_command_bridge.php';
 
 class Manage extends CI_Controller
 {
@@ -39,16 +40,29 @@ class Manage extends CI_Controller
             'is_active' => $this->input->post('is_active') ? 1 : 0,
         );
 
+        if (! in_array($payload['property_type'], array('house', 'apartment', 'other'), TRUE)) {
+            $this->master_error('properties', 'Jenis properti tidak valid. Pilih House, Apartment, atau Other.'); return;
+        }
+        if ($payload['code'] === '' || strlen($payload['code']) > 30 || $payload['name'] === '' || mb_strlen($payload['name']) > 120
+            || $this->db->where('code', $payload['code'])->where('id !=', $payload['id'])->count_all_results('gh_properties')) {
+            $this->master_error('properties', 'Kode properti harus unik (maksimal 30 karakter), nama wajib diisi (maksimal 120 karakter).'); return;
+        }
+        if (! $payload['is_active'] && $this->has_enabled_rooms('property_id', $payload['id'])) {
+            $this->master_error('properties', 'Arsipkan kamar terlebih dahulu sebelum menonaktifkan properti.'); return;
+        }
         $ok = $this->Master_model->save_property($payload);
         $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Properti tersimpan.' : 'Properti belum tersimpan. Cek kode dan nama.');
-        redirect('properties');
+        gh_mobile_redirect('properties', 'location', 303);
     }
 
     public function delete_property($id)
     {
+        if ($this->has_enabled_rooms('property_id', (int) $id)) {
+            $this->master_error('properties', 'Arsipkan kamar terlebih dahulu sebelum menonaktifkan properti.'); return;
+        }
         $ok = $this->Master_model->soft_delete_property((int) $id);
         $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Properti dinonaktifkan.' : 'Properti belum bisa dinonaktifkan.');
-        redirect('properties');
+        gh_mobile_redirect('properties', 'location', 303);
     }
 
     public function room_types()
@@ -79,16 +93,26 @@ class Manage extends CI_Controller
             'is_active' => $this->input->post('is_active') ? 1 : 0,
         );
 
+        if ($payload['name'] === '' || mb_strlen($payload['name']) > 80
+            || $this->db->where('name', $payload['name'])->where('id !=', $payload['id'])->count_all_results('gh_room_types')) {
+            $this->master_error('room-types', 'Nama tipe harus unik dan diisi maksimal 80 karakter.'); return;
+        }
+        if (! $payload['is_active'] && $this->has_enabled_rooms('room_type_id', $payload['id'])) {
+            $this->master_error('room-types', 'Arsipkan kamar terlebih dahulu sebelum menonaktifkan tipe.'); return;
+        }
         $ok = $this->Master_model->save_room_type($payload);
         $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Tipe kamar tersimpan.' : 'Tipe kamar belum tersimpan.');
-        redirect('room-types');
+        gh_mobile_redirect('room-types', 'location', 303);
     }
 
     public function delete_room_type($id)
     {
+        if ($this->has_enabled_rooms('room_type_id', (int) $id)) {
+            $this->master_error('room-types', 'Arsipkan kamar terlebih dahulu sebelum menonaktifkan tipe.'); return;
+        }
         $ok = $this->Master_model->soft_delete_room_type((int) $id);
         $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Tipe kamar dinonaktifkan.' : 'Tipe kamar belum bisa dinonaktifkan.');
-        redirect('room-types');
+        gh_mobile_redirect('room-types', 'location', 303);
     }
 
     public function rooms()
@@ -130,22 +154,39 @@ class Manage extends CI_Controller
             'is_public' => $this->input->post('is_public') ? 1 : 0,
         );
 
+        $property = $this->db->where('id', $payload['property_id'])->where('is_active', 1)->get('gh_properties')->row_array();
+        $type = $this->db->where('id', $payload['room_type_id'])->where('is_active', 1)->get('gh_room_types')->row_array();
+        if (! $property || ! $type || $payload['room_code'] === '' || strlen($payload['room_code']) > 30
+            || mb_strlen($payload['room_name']) > 100 || mb_strlen($payload['room_label']) > 150
+            || ($payload['floor_no'] !== NULL && ($payload['floor_no'] < 0 || $payload['floor_no'] > 255))
+            || $this->db->where('property_id', $payload['property_id'])->where('room_code', $payload['room_code'])->where('id !=', $payload['id'])->count_all_results('gh_rooms')) {
+            $this->master_error('rooms', 'Kode kamar harus unik pada properti aktif. Periksa tipe, panjang teks, dan lantai (0–255).'); return;
+        }
+        if ($payload['id'] && $this->has_open_stay($payload['id'])) {
+            $current = $this->Master_model->get_room($payload['id']);
+            if (! $current || $payload['status'] !== $current['status'] || $payload['property_id'] !== (int) $current['property_id'] || $payload['room_type_id'] !== (int) $current['room_type_id']) {
+                $this->master_error('rooms', 'Kamar memiliki masa tinggal berjalan. Ubah status melalui alur kontrak/check-out terlebih dahulu.'); return;
+            }
+        }
         $ok = $this->Master_model->save_room($payload);
         $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Kamar tersimpan.' : 'Kamar belum tersimpan.');
-        redirect('rooms');
+        gh_mobile_redirect('rooms', 'location', 303);
     }
 
     public function delete_room($id)
     {
+        if ($this->has_open_stay((int) $id)) {
+            $this->master_error('rooms', 'Kamar memiliki masa tinggal berjalan. Selesaikan check-out terlebih dahulu.'); return;
+        }
         $ok = $this->Master_model->soft_delete_room((int) $id);
         $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Kamar diarsipkan.' : 'Kamar belum bisa diarsipkan.');
-        redirect('rooms');
+        gh_mobile_redirect('rooms', 'location', 303);
     }
 
     public function toggle_room_public($id)
     {
         $this->Master_model->toggle_room_public((int) $id);
-        redirect('rooms');
+        gh_mobile_redirect('rooms', 'location', 303);
     }
 
     public function photos()
@@ -195,7 +236,7 @@ class Manage extends CI_Controller
     {
         $result = $this->store_uploaded_photos('photos', $this->uploads_path('SLIDER'), 'slider');
         $this->session->set_flashdata($result['ok'] ? 'success' : 'error', $result['message']);
-        redirect('photos');
+        gh_mobile_redirect('photos', 'location', 303);
     }
 
     public function upload_room_photos()
@@ -242,7 +283,7 @@ class Manage extends CI_Controller
 
         if ($savedTotal === 0) {
             $this->session->set_flashdata('error', 'Foto belum tersimpan. Pastikan setiap row sudah lengkap dan file berformat JPG, JPEG, PNG, atau WEBP.');
-            redirect('photos');
+            gh_mobile_redirect('photos', 'location', 303);
             return;
         }
 
@@ -252,15 +293,15 @@ class Manage extends CI_Controller
         }
 
         $this->session->set_flashdata('success', $message);
-        redirect($lastProperty && $lastType ? 'photos?property=' . rawurlencode($lastProperty) . '&type=' . rawurlencode($lastType) : 'photos');
+        gh_mobile_redirect($lastProperty && $lastType ? 'photos?property=' . rawurlencode($lastProperty) . '&type=' . rawurlencode($lastType) : 'photos', 'location', 303);
     }
 
     public function delete_photo()
     {
-        $scope = trim((string) $this->input->get('scope', TRUE));
-        $property = trim((string) $this->input->get('property', TRUE));
-        $type = trim((string) $this->input->get('type', TRUE));
-        $file = basename(rawurldecode((string) $this->input->get('file', TRUE)));
+        $scope = trim((string) $this->input->get_post('scope', TRUE));
+        $property = trim((string) $this->input->get_post('property', TRUE));
+        $type = trim((string) $this->input->get_post('type', TRUE));
+        $file = basename(rawurldecode((string) $this->input->get_post('file', TRUE)));
         $directory = $scope === 'slider'
             ? $this->uploads_path('SLIDER')
             : $this->uploads_path($this->folder_key($property) . '/' . $this->folder_key($type));
@@ -268,13 +309,13 @@ class Manage extends CI_Controller
 
         if (! $path || ! is_file($path)) {
             $this->session->set_flashdata('error', 'Foto tidak ditemukan.');
-            redirect('photos');
+            gh_mobile_redirect('photos', 'location', 303);
             return;
         }
 
         $ok = unlink($path);
         $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Foto berhasil dihapus.' : 'Foto belum bisa dihapus.');
-        redirect($scope === 'slider' ? 'photos' : 'photos?property=' . rawurlencode($property) . '&type=' . rawurlencode($type));
+        gh_mobile_redirect($scope === 'slider' ? 'photos' : 'photos?property=' . rawurlencode($property) . '&type=' . rawurlencode($type), 'location', 303);
     }
 
     public function view_photo()
@@ -312,7 +353,8 @@ class Manage extends CI_Controller
             ? $this->uploads_path('SLIDER')
             : $this->uploads_path($this->folder_key($property) . '/' . $this->folder_key($type));
         $path = $this->safe_upload_file($directory, $file);
-        $ok = $path && is_file($path) && $this->rotate_image_file($path, $degrees);
+        $ok = $path && is_file($path) && (! empty($_FILES['rotated_file'])
+            ? $this->store_rotated_photo($path, $degrees) : $this->rotate_image_file($path, $degrees));
 
         $this->output
             ->set_content_type('application/json')
@@ -381,15 +423,15 @@ class Manage extends CI_Controller
         );
 
         $ok = $this->Master_model->save_tenant_stay($payload);
-        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Data penghuni tersimpan.' : 'Data penghuni belum tersimpan.');
-        redirect('tenants');
+        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Data penghuni tersimpan.' : 'Data penghuni belum tersimpan. Cek tanggal masuk/keluar, bentrok kamar, NIK yang sudah terdaftar, dan batas perubahan stay berkontrak aktif.');
+        gh_mobile_redirect('tenants', 'location', 303);
     }
 
     public function end_tenant_stay($id)
     {
         $ok = $this->Master_model->end_tenant_stay((int) $id);
-        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Stay penghuni diakhiri dan kamar dibuka kembali.' : 'Stay belum bisa diakhiri.');
-        redirect('tenants');
+        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Stay penghuni diakhiri dan kamar dibuka kembali.' : 'Stay belum bisa diakhiri. Gunakan Proses Kontrak untuk checkout atau pembatalan reservasi yang memiliki kontrak.');
+        gh_mobile_redirect('tenants', 'location', 303);
     }
 
     public function payments()
@@ -404,6 +446,8 @@ class Manage extends CI_Controller
             'q' => trim((string) $this->input->get('q', TRUE)),
         );
 
+        $rows=$this->Master_model->get_payment_bills($filters);
+        $billOptions=$this->Master_model->get_payment_bill_options();$quoteIds=array();foreach(array_merge($rows,$billOptions) as $bill)$quoteIds[]=(int)$bill['id'];
         $this->load->view('manage/payments', array(
             'title' => 'Pembayaran | GUL HOUSE',
             'admin_name' => $this->session->userdata('gh_admin_name'),
@@ -413,34 +457,24 @@ class Manage extends CI_Controller
             'rooms' => $this->Master_model->get_rooms_for_payment_filters(),
             'filters' => $filters,
             'summary' => $this->Master_model->get_payment_summary($filters),
-            'rows' => $this->Master_model->get_payment_bills($filters),
+            'rows' => $rows,
             'issues' => $this->Master_model->get_payment_import_issues(),
+            'bill_options' => $billOptions,
+            'payment_quotes' => $this->Master_model->get_payment_quotes($quoteIds),
         ));
     }
 
     public function save_payment_bill()
     {
-        $payload = array(
-            'bill_id' => (int) $this->input->post('bill_id'),
-            'base_price' => $this->nullable_money($this->input->post('base_price')),
-            'deposit_amount' => $this->nullable_money($this->input->post('deposit_amount')),
-            'due_date' => $this->nullable_date($this->input->post('due_date')),
-            'paid_total' => $this->nullable_money($this->input->post('paid_total')),
-            'past_due_amount' => $this->nullable_money($this->input->post('past_due_amount')),
-            'future_due_amount' => $this->nullable_money($this->input->post('future_due_amount')),
-            'bill_status' => trim((string) $this->input->post('bill_status', TRUE)),
-            'notes' => trim((string) $this->input->post('notes', TRUE)),
-        );
-
-        $ok = $this->Master_model->save_payment_bill($payload);
-        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Bill pembayaran tersimpan.' : 'Bill pembayaran belum tersimpan.');
-        redirect($this->payment_redirect_url());
+        $this->session->set_flashdata('error', 'Tagihan bersifat baca-saja dan diterbitkan otomatis dari kesepakatan sewa.');
+        gh_mobile_redirect($this->payment_redirect_url(), 'location', 303);
     }
 
     public function save_payment()
     {
         $payload = array(
             'payment_id' => (int) $this->input->post('payment_id'),
+            'request_key' => trim((string) $this->input->post('request_key', TRUE)),
             'room_bill_id' => (int) $this->input->post('room_bill_id'),
             'payment_date' => $this->nullable_date($this->input->post('payment_date')),
             'payment_date_text' => trim((string) $this->input->post('payment_date_text', TRUE)),
@@ -451,16 +485,17 @@ class Manage extends CI_Controller
             'notes' => trim((string) $this->input->post('notes', TRUE)),
         );
 
+        if($payload['payment_id']>0){$posted=$this->input->post(NULL,FALSE)?:array();foreach(array('amount','payment_type','method','payment_date','payment_date_text','reference_no') as $field)if(!array_key_exists($field,$posted))unset($payload[$field]);}
         $ok = $this->Master_model->save_payment($payload);
-        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Pembayaran tersimpan.' : 'Pembayaran belum tersimpan.');
-        redirect($this->payment_redirect_url());
+        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Pembayaran tersimpan.' : ($this->Master_model->get_payment_error()?:'Pembayaran belum tersimpan. Muat ulang sisa tagihan dan gunakan nominal otomatis dengan metode Transfer.'));
+        gh_mobile_redirect($this->payment_redirect_url(), 'location', 303);
     }
 
     public function delete_payment($id)
     {
         $ok = $this->Master_model->delete_payment((int) $id);
         $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Pembayaran dihapus.' : 'Pembayaran belum bisa dihapus.');
-        redirect($this->payment_redirect_url());
+        gh_mobile_redirect($this->payment_redirect_url(), 'location', 303);
     }
 
     private function nullable_int($value)
@@ -471,8 +506,12 @@ class Manage extends CI_Controller
 
     private function nullable_money($value)
     {
-        $value = preg_replace('/[^0-9]/', '', (string) $value);
-        return $value === '' ? null : (int) $value;
+        if (! is_scalar($value) && $value !== null) return -1;
+        $value = trim((string) $value);
+        if ($value === '') return null;
+        if (! preg_match('/^(?:Rp\s*)?(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,00)?$/i', $value)) return -1;
+        $digits = str_replace('.', '', preg_replace('/,00$/', '', preg_replace('/^Rp\s*/i', '', $value)));
+        return strlen($digits) > 15 ? -1 : (int) $digits;
     }
 
     private function nullable_date($value)
@@ -592,7 +631,12 @@ class Manage extends CI_Controller
                 continue;
             }
 
-            if (! $this->is_allowed_image($originalName) || ! @getimagesize($files['tmp_name'][$index])) {
+            $imageInfo = @getimagesize($files['tmp_name'][$index]);
+            $expectedTypes = array('jpg' => IMAGETYPE_JPEG, 'jpeg' => IMAGETYPE_JPEG, 'png' => IMAGETYPE_PNG, 'webp' => IMAGETYPE_WEBP);
+            $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+            if (! $this->is_allowed_image($originalName) || ! $imageInfo || ! isset($expectedTypes[$extension])
+                || $imageInfo[2] !== $expectedTypes[$extension] || (int) $files['size'][$index] > 10 * 1024 * 1024
+                || $imageInfo[0] * $imageInfo[1] > 40000000) {
                 $failed++;
                 continue;
             }
@@ -707,6 +751,19 @@ class Manage extends CI_Controller
         return 'Kamar';
     }
 
+    private function store_rotated_photo($path, $degrees)
+    {
+        if (! in_array($degrees, array(90, 180, 270), TRUE)) { return FALSE; }
+        $file = $_FILES['rotated_file'];
+        if ($file['error'] !== UPLOAD_ERR_OK || ! is_uploaded_file($file['tmp_name']) || $file['size'] > 10 * 1024 * 1024) { return FALSE; }
+        $original = @getimagesize($path);
+        $rotated = @getimagesize($file['tmp_name']);
+        if (! $original || ! $rotated || $original[2] !== $rotated[2]) { return FALSE; }
+        $swap = $degrees === 90 || $degrees === 270;
+        if ($rotated[0] !== $original[$swap ? 1 : 0] || $rotated[1] !== $original[$swap ? 0 : 1]) { return FALSE; }
+        return move_uploaded_file($file['tmp_name'], $path);
+    }
+
     private function rotate_image_file($path, $degrees)
     {
         $degrees = $degrees % 360;
@@ -783,10 +840,28 @@ class Manage extends CI_Controller
         return (bool) preg_match('/\.(jpe?g|png|webp)$/i', (string) $filename);
     }
 
+    private function master_error($route, $message)
+    {
+        $this->session->set_flashdata('error', $message);
+        gh_mobile_redirect($route, 'location', 303);
+    }
+
+    private function has_enabled_rooms($field, $id)
+    {
+        return $id > 0 && $this->db->where($field, $id)->where('status !=', 'inactive')->count_all_results('gh_rooms') > 0;
+    }
+
+    private function has_open_stay($roomId)
+    {
+        return $roomId > 0 && $this->db->table_exists('gh_tenant_stays') && $this->db->where('room_id', $roomId)
+            ->where_in('stay_status', array('active', 'reserved', 'internal'))->count_all_results('gh_tenant_stays') > 0;
+    }
+
     private function require_login()
     {
         if ( ! $this->session->userdata('gh_admin_logged_in')) {
-            redirect('login');
+            $this->session->set_flashdata('error', 'Sesi belum aktif. Silakan login terlebih dahulu.');
+            gh_mobile_redirect('login', 'location', 303);
         }
     }
 }

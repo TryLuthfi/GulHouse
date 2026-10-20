@@ -1,0 +1,108 @@
+<?php
+require __DIR__ . '/http-helpers.php';
+try {
+    list($code,$html)=request('/master/index.php/login'); check($code===200,'login form available');
+    list($code)=request('/master/index.php/login',array('username'=>'codex_trial','password'=>'invalid'),false); check($code===403,'CSRF blocks tokenless login');
+    list($code,$html)=post('/master/index.php/login',array('username'=>'codex_trial','password'=>getenv('GULHOUSE_E2E_PASS') ?: 'LocalDemo2026!'),'/master/index.php/login');
+    check($code===200 && strpos($html,'Dashboard Operasional GulHouse')!==false,'admin login');
+    list($code)=request('/master/index.php/rooms/delete/8',null,false); check($code===405,'GET cannot mutate room');
+    list($code,$landing)=request('/landing/index.php/'); check($code===200,'landing loads');
+    $dom=new DOMDocument(); @$dom->loadHTML($landing); $xpath=new DOMXPath($dom);
+    $options=$xpath->query('//select[@name="room_interest"]/option[@value!=""]');
+    check($options->length>0,'booking has room choices');
+    $room=row("SELECT r.*,CONCAT(p.code,' - ',t.name) interest FROM gh_rooms r JOIN gh_properties p ON p.id=r.property_id JOIN gh_room_types t ON t.id=r.room_type_id WHERE r.status='available' AND r.is_public=1 AND r.monthly_price>0 ORDER BY r.id LIMIT 1");
+    $interest=$room['interest'];
+    $stamp=(string)time(); $name='DEMO Flow '.$stamp; $phone='089998'.substr($stamp,-6);
+    $booking=array('fullname'=>$name,'phone'=>$phone,'room_interest'=>$interest,'move_in_plan'=>'1 November 2026','message'=>'Demo flow only');
+    post('/landing/index.php/booking',array_merge($booking,array('phone'=>'bad')),'/landing/index.php/');
+    check(count_rows("SELECT COUNT(*) n FROM gh_booking_requests WHERE fullname='$name'")===0,'invalid phone rejected');
+    post('/landing/index.php/booking',$booking,'/landing/index.php/'); post('/landing/index.php/booking',$booking,'/landing/index.php/');
+    check(count_rows("SELECT COUNT(*) n FROM gh_booking_requests WHERE fullname='$name'")===1,'duplicate booking creates one lead');
+    $lead=row("SELECT * FROM gh_booking_requests WHERE fullname='$name'");
+    $roomId=(int)$room['id'];
+    $convert=array('room_id'=>$roomId,'start_date'=>'2026-11-01','end_date'=>'2026-11-30','stay_status'=>'reserved');
+    list($code,$bookingHtml)=request('/master/index.php/booking');
+    $bookingDom=new DOMDocument(); @$bookingDom->loadHTML($bookingHtml); $bookingXpath=new DOMXPath($bookingDom);
+    check($bookingXpath->query('//div[@id="booking-convert-'.$lead['id'].'"]//input[@type="date"][@required]')->length===2,'conversion dates required in form');
+    $rejects=array(
+        array(array('start_date'=>''),'Tanggal mulai dan tanggal akhir wajib'),
+        array(array('end_date'=>'2026-10-31'),'Tanggal akhir tidak boleh sebelum'),
+        array(array('room_id'=>0),'Pilih kamar yang valid'),
+    );
+    foreach($rejects as $reject) {
+        list($code,$html)=post('/master/index.php/booking/convert/'.$lead['id'],array_merge($convert,$reject[0]),'/master/index.php/booking');
+        check($code===200 && strpos($html,$reject[1])!==false,'conversion explains invalid input: '.$reject[1]);
+    }
+    $db->query("UPDATE gh_booking_requests SET status='cancelled' WHERE id=".(int)$lead['id']);
+    list($code,$html)=post('/master/index.php/booking/convert/'.$lead['id'],$convert,'/master/index.php/booking');
+    check(strpos($html,'Booking berstatus batal')!==false,'conversion explains cancelled booking');
+    $db->query("UPDATE gh_booking_requests SET status='new' WHERE id=".(int)$lead['id']);
+    $db->query("UPDATE gh_rooms SET status='maintenance' WHERE id=$roomId");
+    list($code,$html)=post('/master/index.php/booking/convert/'.$lead['id'],$convert,'/master/index.php/booking');
+    check(strpos($html,'Kamar sedang maintenance')!==false,'conversion explains unavailable room');
+    $db->query("UPDATE gh_rooms SET status='available' WHERE id=$roomId");
+    check(count_rows("SELECT COUNT(*) n FROM gh_tenants WHERE fullname='$name'")===0,'rejected conversions do not create tenant');
+    post('/master/index.php/booking/convert/'.$lead['id'],$convert,'/master/index.php/booking');
+    list($code,$html)=post('/master/index.php/booking/convert/'.$lead['id'],$convert,'/master/index.php/booking');
+    check(strpos($html,'Booking ini sudah dikonversi')!==false,'conversion explains already converted booking');
+    post('/landing/index.php/booking',array_merge($booking,array('fullname'=>$name.' overlap','phone'=>$phone.'1')),'/landing/index.php/');
+    $overlapLead=row("SELECT id FROM gh_booking_requests WHERE fullname='$name overlap'");
+    list($code,$html)=post('/master/index.php/booking/convert/'.$overlapLead['id'],$convert,'/master/index.php/booking');
+    check(strpos($html,'Kamar sudah memiliki penghuni atau reservasi')!==false,'conversion explains overlapping reservation');
+    check(count_rows("SELECT COUNT(*) n FROM gh_tenants WHERE fullname='$name overlap'")===0,'overlapping conversion does not create tenant');
+    check(count_rows("SELECT COUNT(*) n FROM gh_tenants WHERE fullname='$name'")===1,'conversion idempotent');
+    $tenant=row("SELECT * FROM gh_tenants WHERE fullname='$name'"); $tenantId=(int)$tenant['id'];
+    $stay=row('SELECT * FROM gh_tenant_stays WHERE tenant_id='.$tenantId); $stayId=(int)$stay['id'];
+    $contract=row('SELECT * FROM gh_contracts WHERE tenant_id='.$tenantId); $contractId=(int)$contract['id'];
+    check($stay['stay_status']==='reserved' && $contract['status']==='draft','booking reserves and drafts contract');
+    check(count_rows('SELECT COUNT(*) n FROM gh_contract_documents WHERE contract_id='.$contractId)===5,'five document checklist rows');
+    post('/master/index.php/billing/generate',array('period_key'=>'2026-11'),'/master/index.php/billing');
+    check((int)row('SELECT base_price FROM gh_room_bills WHERE room_id='.$roomId)['base_price']===0,'reserved room does not accrue rent');
+    list($code,$html)=post('/master/index.php/contracts/action/'.$contractId.'/activate',array('signed_at'=>'2026-11-01'),'/master/index.php/contracts');
+    check(strpos($html,'checklist KTP belum diterima/diverifikasi')!==false,'activation explains missing KTP checklist');
+    check(row('SELECT status FROM gh_contracts WHERE id='.$contractId)['status']==='draft','activation rejects missing administration/deposit');
+    $documents=$db->query('SELECT * FROM gh_contract_documents WHERE contract_id='.$contractId)->fetch_all(MYSQLI_ASSOC);
+    foreach($documents as $document) post('/master/index.php/ops/documents/save',array('id'=>$document['id'],'contract_id'=>$contractId,'tenant_id'=>$tenantId,'document_type'=>$document['document_type'],'document_title'=>$document['document_title'],'status'=>'verified','received_at'=>'2026-11-01','notes'=>'Synthetic verified checklist'),'/master/index.php/documents');
+    list($code,$html)=post('/master/index.php/contracts/action/'.$contractId.'/activate',array('signed_at'=>'2026-11-01'),'/master/index.php/contracts');
+    check(strpos($html,'konfirmasi pemeriksaan kamar')!==false,'activation explains missing inspection');
+    list($code,$html)=post('/master/index.php/contracts/action/'.$contractId.'/activate',array('signed_at'=>'2026-11-01','inspection_confirmed'=>1),'/master/index.php/contracts');
+    check(strpos($html,'saldo deposit belum mencukupi')!==false,'activation explains missing deposit');
+    post('/master/index.php/ops/deposits/save',array('tenant_id'=>$tenantId,'room_id'=>$roomId,'stay_id'=>$stayId,'transaction_date'=>'2026-11-01','transaction_type'=>'received','amount'=>$contract['deposit_amount'],'method'=>'Cash demo','reference_no'=>'FLOW-DEPOSIT-'.$stamp,'description'=>'Demo deposit'),'/master/index.php/deposits');
+    post('/master/index.php/contracts/action/'.$contractId.'/activate',array('signed_at'=>'2026-11-01','inspection_confirmed'=>1),'/master/index.php/contracts');
+    check(row('SELECT status FROM gh_contracts WHERE id='.$contractId)['status']==='active','contract activation');
+    check(row('SELECT status FROM gh_rooms WHERE id='.$roomId)['status']==='occupied','check-in marks room occupied');
+    check(count_rows('SELECT COUNT(*) n FROM gh_inventory_checks WHERE room_id='.$roomId.' AND check_stage="check_in"')>0,'check-in inventory generated');
+    post('/master/index.php/billing/generate',array('period_key'=>'2026-11'),'/master/index.php/billing');
+    $invoice=row('SELECT * FROM gh_room_bills WHERE stay_id='.$stayId.' ORDER BY id DESC LIMIT 1'); $billId=(int)$invoice['id']; $rent=(int)$contract['monthly_price'];
+    check((int)$invoice['base_price']===$rent && $invoice['bill_status']==='unpaid','placeholder becomes active contract invoice');
+    post('/master/index.php/billing/generate',array('period_key'=>'2026-11'),'/master/index.php/billing');
+    check(count_rows('SELECT COUNT(*) n FROM gh_room_bills WHERE stay_id='.$stayId)===1,'billing idempotent');
+    payment($billId,50000,'deposit','FLOW-PAYDEP-'.$stamp); check((int)bill($billId)['paid_total']===0,'deposit payment does not reduce rent');
+    $part=(int)floor($rent/2); payment($billId,$part,'rent','FLOW-PART-'.$stamp);
+    check((int)bill($billId)['paid_total']===$part && bill($billId)['bill_status']==='partial','partial rent reconciles');
+    payment($billId,$part,'rent','FLOW-PART-'.$stamp); check((int)bill($billId)['paid_total']===$part,'duplicate payment reference idempotent');
+    post('/master/index.php/contracts/action/'.$contractId.'/checkout',array('checkout_date'=>'2026-11-30','refund_amount'=>$contract['deposit_amount'],'deduction_amount'=>0,'inspection_confirmed'=>1),'/master/index.php/contracts');
+    check(row('SELECT stay_status FROM gh_tenant_stays WHERE id='.$stayId)['stay_status']==='active','refund blocked while rent outstanding');
+    payment($billId,$rent-$part,'rent','FLOW-REST-'.$stamp); check(bill($billId)['bill_status']==='paid','full rent paid');
+    post('/master/index.php/contracts/action/'.$contractId.'/renew',array('end_date'=>'2026-12-31','monthly_price'=>$rent+100000),'/master/index.php/contracts');
+    $renewal=row('SELECT * FROM gh_contracts WHERE stay_id='.$stayId.' ORDER BY id DESC LIMIT 1');
+    check($renewal['start_date']==='2026-12-01' && (int)$renewal['monthly_price']===$rent+100000,'renewal snapshots future tariff');
+    check((int)bill($billId)['base_price']===$rent,'renewal preserves prior invoice');
+    post('/master/index.php/billing/generate',array('period_key'=>'2026-12'),'/master/index.php/billing');
+    $future=row('SELECT b.* FROM gh_room_bills b JOIN gh_billing_periods p ON p.id=b.period_id WHERE b.stay_id='.$stayId.' AND p.period_key="2026-12"');
+    check((int)$future['base_price']===$rent+100000,'future invoice uses renewed tariff');
+    post('/master/index.php/contracts/action/'.$renewal['id'].'/checkout',array('checkout_date'=>'2026-11-30','refund_amount'=>99999999,'deduction_amount'=>0,'inspection_confirmed'=>1),'/master/index.php/contracts');
+    check(row('SELECT stay_status FROM gh_tenant_stays WHERE id='.$stayId)['stay_status']==='active','excess refund rejected');
+    $balance=row('SELECT SUM(CASE WHEN transaction_type IN ("received","adjustment") THEN amount ELSE -CAST(amount AS SIGNED) END) balance FROM gh_deposit_transactions WHERE stay_id='.$stayId)['balance'];
+    post('/master/index.php/contracts/action/'.$renewal['id'].'/checkout',array('checkout_date'=>'2026-11-30','refund_amount'=>$balance-50000,'deduction_amount'=>50000,'deduction_reason'=>'Demo damage inspected','inspection_confirmed'=>1,'needs_maintenance'=>1),'/master/index.php/contracts');
+    check(row('SELECT stay_status FROM gh_tenant_stays WHERE id='.$stayId)['stay_status']==='ended','checkout closes stay');
+    check(row('SELECT status FROM gh_rooms WHERE id='.$roomId)['status']==='maintenance','checkout can request maintenance');
+    check(bill($future['id'])['bill_status']==='empty' && (int)bill($future['id'])['base_price']===0,'future unpaid invoice cancelled');
+    check(row('SELECT status FROM gh_contracts WHERE id='.$renewal['id'])['status']==='cancelled','future renewal cancelled on early checkout');
+    check((int)row('SELECT SUM(CASE WHEN transaction_type IN ("received","adjustment") THEN amount ELSE -CAST(amount AS SIGNED) END) balance FROM gh_deposit_transactions WHERE stay_id='.$stayId)['balance']===0,'deposit settles exactly');
+    $dep=row('SELECT id FROM gh_payments WHERE room_bill_id='.$billId.' AND payment_type="deposit"');
+    post('/master/index.php/payments/delete-payment/'.$dep['id'],array(),'/master/index.php/payments');
+    check(count_rows('SELECT COUNT(*) n FROM gh_payments WHERE id='.$dep['id'])===1,'deposit reversal cannot make settled balance negative');
+    list($code,$html)=request('/master/index.php/reports'); check($code===200 && strpos($html,'Maintenance open')!==false,'owner report loads');
+    echo json_encode(array('passed'=>$checks,'schema'=>$schema,'complete'=>true)).PHP_EOL;
+} finally { if (is_file($cookie)) unlink($cookie); }

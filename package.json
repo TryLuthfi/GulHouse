@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "e2e": "e2e run",
+    "e2e:list": "e2e list",
+    "e2e:master": "e2e run tests/gulhouse-master.e2e.ts",
+    "e2e:journey": "e2e run tests/gulhouse-journey.e2e.ts",
+    "e2e:full": "e2e run tests/gulhouse-master.e2e.ts tests/gulhouse-journey.e2e.ts tests/gulhouse-lifecycle.e2e.ts tests/gulhouse-tenants.e2e.ts tests/gulhouse-financial.e2e.ts tests/gulhouse-operations.e2e.ts tests/gulhouse-admin.e2e.ts tests/gulhouse-portal.e2e.ts tests/gulhouse-payment-proofs.e2e.ts tests/gulhouse-billing-job.e2e.ts tests/gulhouse-overpayment.e2e.ts",
+    "e2e:addons": "e2e run tests/gulhouse-payment-proofs.e2e.ts tests/gulhouse-billing-job.e2e.ts",
+    "e2e:overpayment": "e2e run tests/gulhouse-overpayment.e2e.ts"
+  },
+  "devDependencies": {
+    "@e2e-dev/web": "^0.14.0",
+    "e2e": "^0.19.0"
+  }
+}

@@ -3,21 +3,27 @@ if (isset($_SERVER['REQUEST_URI']))
 {
 	$masterUriPath = parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_PATH);
 	$masterUriPath = $masterUriPath === false ? '' : '/' . ltrim($masterUriPath, '/');
+	$masterBasePath = null;
 
-	if ($masterUriPath === '/master')
+	if (preg_match('#^(.*?)/master(?:/|$)#', $masterUriPath, $masterMatch))
+	{
+		$masterBasePath = ($masterMatch[1] === '' ? '' : $masterMatch[1]) . '/master';
+	}
+
+	if ($masterBasePath !== null && $masterUriPath === $masterBasePath)
 	{
 		$queryString = isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== '' ? '?' . $_SERVER['QUERY_STRING'] : '';
-		header('Location: /master/' . $queryString, true, 301);
+		header('Location: ' . $masterBasePath . '/' . $queryString, true, 301);
 		exit;
 	}
 
-	if (strpos($masterUriPath, '/master/') === 0)
+	if ($masterBasePath !== null && strpos($masterUriPath, $masterBasePath . '/') === 0)
 	{
 		$masterRoot = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'master');
 
-		if ($masterRoot !== false && strpos($masterUriPath, '/master/assets/') === 0)
+		if ($masterRoot !== false && strpos($masterUriPath, $masterBasePath . '/assets/') === 0)
 		{
-			$assetRelativePath = str_replace('/', DIRECTORY_SEPARATOR, substr($masterUriPath, strlen('/master/assets/')));
+			$assetRelativePath = str_replace('/', DIRECTORY_SEPARATOR, substr($masterUriPath, strlen($masterBasePath . '/assets/')));
 			$assetPath = realpath($masterRoot . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . $assetRelativePath);
 			$assetsRoot = realpath($masterRoot . DIRECTORY_SEPARATOR . 'assets');
 
@@ -57,8 +63,8 @@ if (isset($_SERVER['REQUEST_URI']))
 		if ($masterRoot !== false && is_file($masterRoot . DIRECTORY_SEPARATOR . 'index.php'))
 		{
 			chdir($masterRoot);
-			$_SERVER['SCRIPT_NAME'] = '/master/index.php';
-			$_SERVER['PHP_SELF'] = '/master/index.php';
+			$_SERVER['SCRIPT_NAME'] = $masterBasePath . '/index.php';
+			$_SERVER['PHP_SELF'] = $masterBasePath . '/index.php';
 			$_SERVER['SCRIPT_FILENAME'] = $masterRoot . DIRECTORY_SEPARATOR . 'index.php';
 			$_SERVER['DOCUMENT_ROOT'] = dirname($masterRoot);
 

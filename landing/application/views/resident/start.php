@@ -1,0 +1,21 @@
+<?php defined('BASEPATH') OR exit('No direct script access allowed'); $this->load->view('resident/header'); ?>
+<section class="lc-hero"><p class="eyebrow">Selamat datang di GulHouse</p><h1>Kamar nyaman, proses masuk lebih mudah.</h1><p>Sudah survey melalui WhatsApp atau datang langsung? Isi identitas awal agar pengelola dapat menindaklanjuti pilihan kamar Anda.</p><ol class="lc-steps" aria-label="Tahap pendaftaran"><li class="done">1. Identitas awal</li><li>2. Konfirmasi & pembayaran</li><li>3. Biodata lengkap</li><li>4. Serah terima kamar</li></ol></section>
+<div class="lc-split"><section class="lc-card"><p class="eyebrow">Langkah pertama</p><h2>Data calon penghuni</h2><p class="muted">Kolom bertanda * wajib diisi. Pendaftaran belum menjadi konfirmasi reservasi kamar.</p><form method="post" enctype="multipart/form-data" action="<?= base_url('resident/start'); ?>" data-lc-form><div class="lc-fields">
+<label>Nama lengkap sesuai KTP *<input name="full_name" required maxlength="150" autocomplete="name" value="<?= html_escape($this->input->post('full_name',TRUE)?:''); ?>"></label>
+<label>Nomor WhatsApp aktif *<input type="tel" name="phone" required maxlength="30" autocomplete="tel" value="<?= html_escape($this->input->post('phone',TRUE)?:''); ?>"></label>
+<label>Kamar yang diminati *<select name="room_id" required><option value="">Pilih kamar</option><?php foreach((isset($rooms)?$rooms:array()) as $room): ?><option value="<?= (int)$room['id']; ?>" <?= (string)$this->input->post('room_id')===(string)$room['id']?'selected':''; ?>><?= html_escape(isset($room['display_room'])?$room['display_room']:trim((isset($room['property_code'])?$room['property_code']:'').' '.(isset($room['room_label'])?$room['room_label']:(isset($room['room_code'])?$room['room_code']:$room['id'])))); ?></option><?php endforeach; ?></select></label>
+<label>Rencana tanggal masuk *<input type="date" name="planned_start" required value="<?= html_escape($this->input->post('planned_start',TRUE)?:date('Y-m-d')); ?>"></label>
+<input type="hidden" name="source" value="website">
+<?php foreach (array('ktp_file'=>array('title'=>'KTP terbaru *','help'=>'Wajib. Foto/scan terbaca jelas, PDF/JPG/PNG, maksimal 10 MB. Disimpan privat.'),'marriage_file'=>array('title'=>'Buku nikah (opsional)','help'=>'Lampirkan bila diperlukan untuk pasangan. PDF/JPG/PNG, maksimal 10 MB. Disimpan privat.')) as $field=>$upload): ?>
+<div class="lc-upload" data-lc-upload>
+    <label for="<?= $field; ?>"><?= $upload['title']; ?></label>
+    <p class="lc-help" id="<?= $field; ?>-help"><?= $upload['help']; ?></p>
+    <input id="<?= $field; ?>" type="file" name="<?= $field; ?>" accept=".pdf,.jpg,.jpeg,.png" <?= $field==='ktp_file'?'required':''; ?> aria-describedby="<?= $field; ?>-help <?= $field; ?>-selected">
+    <p class="lc-upload-name" id="<?= $field; ?>-selected" data-lc-file-name role="status">Belum ada berkas dipilih.</p>
+    <img class="lc-upload-preview" data-lc-file-preview hidden alt="Pratinjau berkas yang dipilih">
+    <button type="button" class="secondary" data-lc-file-clear hidden>Hapus pilihan berkas</button>
+</div>
+<?php endforeach; ?></div>
+<label class="lc-check"><input type="checkbox" name="consent" value="1" required><span>Saya menyatakan data benar dan menyetujui penggunaan data serta dokumen untuk administrasi penyewaan GulHouse.</span></label><div class="lc-form-footer"><button type="submit">Kirim identitas awal</button><a href="<?= base_url('resident/access'); ?>">Sudah mendaftar? Masuk portal</a></div></form></section>
+<aside><section class="lc-card"><h3>Setelah formulir dikirim</h3><ol><li>Pengelola mengonfirmasi kamar dan kesepakatan sewa.</li><li>Pembayaran dicatat dan diverifikasi pengelola.</li><li>Anda melengkapi biodata melalui portal.</li><li>Fasilitas diperiksa bersama sebelum serah terima kunci.</li></ol><div class="lc-note">Simpan kode akses pribadi yang muncul setelah pendaftaran. Jangan membagikannya kepada pihak lain.</div></section><section class="lc-card"><h3>Dokumen fasilitas tetap fisik</h3><p class="muted">Tanda terima dan checklist diisi serta ditandatangani bersama. Salinan hasil scan dan riwayat fasilitas dapat dilihat melalui portal.</p></section></aside></div>
+<?php $this->load->view('resident/footer'); ?>

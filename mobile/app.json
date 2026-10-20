@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "GulHouse",
+    "slug": "gulhouse",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "id.gulhouse.app"
+    },
+    "android": {
+      "package": "id.gulhouse.app",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA"
+      ],
+      "predictiveBackGestureEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/gulhouse-logo.png",
+        "backgroundColor": "#EEF4F2"
+      }
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Pilih foto fasilitas atau dokumen untuk GulHouse.",
+          "cameraPermission": "Gunakan kamera untuk memfoto fasilitas dan dokumen GulHouse.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-document-picker",
+      "expo-sharing",
+      "./plugins/withReleaseSigning",
+      "./plugins/withNativeBack"
+    ],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "icon": "./assets/gulhouse-logo.png"
+  }
+}

@@ -49,27 +49,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261001-partial-metric'); ?>">
-</head>
-<body>
-    <aside class="sidebar">
-        <a class="brand" href="<?= base_url('dashboard'); ?>"><span>GH</span><strong>GUL HOUSE</strong></a>
-        <nav>
-            <a href="<?= base_url('dashboard'); ?>">Dashboard</a>
-            <a href="<?= base_url('properties'); ?>">Properti</a>
-            <a class="is-active" href="<?= base_url('room-types'); ?>">Tipe Kamar</a>
-            <a href="<?= base_url('rooms'); ?>">Kamar</a>
-            <a href="<?= base_url('tenants'); ?>">Penghuni</a>
-            <a href="<?= base_url('payments'); ?>">Pembayaran</a>
-            <a href="<?= base_url('photos'); ?>">Foto</a>
-            <a href="#">Booking</a>
-        </nav>
-    </aside>
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261020-admin-ui-1'); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script></head>
+<body class="gh-admin-ui">
+    <?php $this->load->view('partials/sidebar', array('active_menu' => 'room-types')); ?>
 
     <main class="main-shell">
         <header class="topbar">
             <div><p>Master Data</p><h1>Tipe Kamar</h1></div>
-            <div class="admin-chip"><span><?= html_escape($admin_name); ?></span><a href="<?= base_url('logout'); ?>">Logout</a></div>
+            <div class="admin-chip"><span><?= html_escape($admin_name); ?></span><?php $this->load->view('partials/logout'); ?></div>
         </header>
 
         <?php if ($this->session->flashdata('success')): ?><div class="notice success"><?= html_escape($this->session->flashdata('success')); ?></div><?php endif; ?>
@@ -152,7 +140,7 @@
                 <input type="hidden" name="id" value="0">
                 <div class="form-section">
                     <h3 class="form-section-title">Identitas Tipe</h3>
-                    <label>Nama Tipe<input type="text" name="name" required placeholder="Studio"></label>
+                    <label>Nama Tipe<input type="text" name="name" maxlength="80" required placeholder="Studio"></label>
                     <label class="check-row"><input type="checkbox" name="is_active" value="1" checked> Aktif</label>
                 </div>
                 <div class="form-section">
@@ -173,7 +161,7 @@
                     <input type="hidden" name="id" value="<?= (int) $row['id']; ?>">
                     <div class="form-section">
                         <h3 class="form-section-title">Identitas Tipe</h3>
-                        <label>Nama Tipe<input type="text" name="name" required value="<?= html_escape($row['name']); ?>"></label>
+                        <label>Nama Tipe<input type="text" name="name" maxlength="80" required value="<?= html_escape($row['name']); ?>"></label>
                         <label class="check-row"><input type="checkbox" name="is_active" value="1" <?= (int) $row['is_active'] === 1 ? 'checked' : ''; ?>> Aktif</label>
                     </div>
                     <div class="form-section">
@@ -204,6 +192,6 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js?v=20261001-partial-metric'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
 </body>
 </html>

@@ -1,0 +1,78 @@
+.modal[id^="payment-"] input:not([readonly]):not(:disabled),
+.modal[id^="payment-"] textarea:not([readonly]):not(:disabled),
+.modal[id^="payment-"] select:not(:disabled) {
+    background: #fff;
+    color: #203b32;
+}
+
+.modal[id^="payment-"] input[readonly],
+.modal[id^="payment-"] textarea[readonly],
+.modal[id^="bill-edit-"] input[readonly],
+.modal[id^="bill-edit-"] textarea[readonly] {
+    background: #edf1ee;
+    color: #354c40;
+    border-color: #bac8be;
+    cursor: default;
+}
+
+.modal[id^="payment-"] input:disabled,
+.modal[id^="payment-"] textarea:disabled,
+.modal[id^="payment-"] select:disabled {
+    background: #e5e9e6;
+    color: #657269;
+    border-color: #c7cfca;
+    cursor: not-allowed;
+}
+
+.payment-filter-form {
+    min-width: 0;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.payment-filter-form > label,
+.payment-filter-form input,
+.payment-filter-form select,
+.payment-filter-form > button {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.payment-filter-form > label:last-of-type {
+    grid-column: span 2;
+}
+
+@media (min-width: 1600px) {
+    .payment-filter-form {
+        grid-template-columns: repeat(6, minmax(0, 1fr)) auto;
+    }
+
+    .payment-filter-form > label:last-of-type {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 980px) {
+    .modal[id^="bill-edit-"] .form-section {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .payment-filter-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .payment-filter-form > label:last-of-type {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 640px) {
+    .modal[id^="bill-edit-"] .form-section {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 680px) {
+    .payment-filter-form {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

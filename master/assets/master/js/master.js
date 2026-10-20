@@ -98,7 +98,7 @@
         var deleteUrl = '';
         var modal = document.querySelector('[data-delete-confirm-modal]');
         var link = document.querySelector('[data-confirm-delete]');
-        var label = document.querySelector('[data-delete-label]');
+        var label = modal ? modal.querySelector('[data-delete-label]') : null;
 
         document.querySelectorAll('[data-delete-url]').forEach(function (trigger) {
             if (trigger.getAttribute('data-delete-ready') === 'true') {
@@ -118,7 +118,7 @@
         if (link && link.getAttribute('data-confirm-delete-ready') !== 'true') {
             link.addEventListener('click', function () {
                 if (deleteUrl) {
-                    window.location.href = deleteUrl;
+                    if (window.GHSubmitPost) { window.GHSubmitPost(deleteUrl); }
                 }
             });
             link.setAttribute('data-confirm-delete-ready', 'true');
@@ -130,11 +130,11 @@
     }
 
     function formatRupiahInput(value) {
-        var digits = String(value || '').replace(/\D/g, '');
-        if (!digits) {
-            return '';
-        }
-
+        var raw = String(value || '').trim();
+        if (!raw) { return ''; }
+        if (!/^(?:Rp\s*)?(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,00)?$/i.test(raw)) { return null; }
+        var digits = raw.replace(/^Rp\s*/i, '').replace(/,00$/, '').replace(/\./g, '');
+        if (digits.length > 15) { return null; }
         return 'Rp ' + digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
 
@@ -145,7 +145,9 @@
             }
 
             function sync() {
-                input.value = formatRupiahInput(input.value);
+                var formatted = formatRupiahInput(input.value);
+                input.setCustomValidity(formatted === null ? 'Isi nominal rupiah positif dengan angka biasa, contoh 1500000 atau Rp 1.500.000,00.' : '');
+                if (formatted !== null) { input.value = formatted; }
             }
 
             input.addEventListener('input', sync);
@@ -252,6 +254,43 @@
         var charts = window.GH_DASHBOARD_CHARTS;
         var colors = ['#487fff', '#ff9f29', '#45b369', '#8b5cf6', '#ef4a00', '#00b8d9', '#f866b9', '#7c3aed'];
 
+        function plainNumber(value) {
+            return Number(value || 0).toLocaleString('id-ID');
+        }
+
+        var doughnutValueLabels = {
+            id: 'ghDoughnutValueLabels',
+            afterDatasetsDraw: function (chart) {
+                var dataset = chart.data.datasets[0];
+                var meta = chart.getDatasetMeta(0);
+                if (!dataset || !meta || meta.hidden) {
+                    return;
+                }
+
+                var ctx = chart.ctx;
+                ctx.save();
+                ctx.font = '700 11px Inter, Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowColor = 'rgba(15, 23, 42, .38)';
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetY = 1;
+
+                meta.data.forEach(function (arc, index) {
+                    var value = Number(dataset.data[index] || 0);
+                    if (!value || arc.hidden) {
+                        return;
+                    }
+
+                    var position = arc.tooltipPosition();
+                    ctx.fillText(plainNumber(value), position.x, position.y);
+                });
+
+                ctx.restore();
+            }
+        };
+
         function makeBar(id, data, horizontal) {
             var el = document.getElementById(id);
             if (!el || !data) {
@@ -357,10 +396,19 @@
                 },
                 options: {
                     plugins: {
-                        legend: { position: 'bottom' }
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    return ctx.label + ': ' + plainNumber(ctx.raw);
+                                }
+                            }
+                        }
                     },
+                    layout: { padding: 10 },
                     cutout: '62%'
-                }
+                },
+                plugins: [doughnutValueLabels]
             });
         }
 
@@ -783,6 +831,7 @@
         var title = modal.querySelector('[data-master-photo-title]');
         var category = modal.querySelector('[data-master-photo-category]');
         var counter = modal.querySelector('[data-master-photo-counter]');
+        var download = modal.querySelector('[data-master-photo-download]');
         var activeIndex = 0;
         var scale = 1;
         var rotate = 0;
@@ -816,6 +865,11 @@
             activeIndex = (index + triggers.length) % triggers.length;
             var item = triggers[activeIndex];
             resetView();
+
+            if (download) {
+                download.href = item.getAttribute('data-photo-src') || '#';
+                download.setAttribute('download', item.getAttribute('data-photo-file') || 'foto');
+            }
 
             if (image) {
                 image.src = item.getAttribute('data-photo-src') || '';
@@ -930,13 +984,29 @@
                 body.append('type', item.getAttribute('data-photo-type') || '');
                 body.append('file', item.getAttribute('data-photo-file') || '');
                 body.append('degrees', degrees);
+                if (window.GH_CSRF) { body.append(window.GH_CSRF.name, window.GH_CSRF.value); }
                 save.disabled = true;
                 save.textContent = 'Menyimpan';
 
-                fetch(save.getAttribute('data-save-url'), {
-                    method: 'POST',
-                    body: body,
-                    credentials: 'same-origin'
+                // Rotate pixels in the browser so saving also works without PHP GD.
+                new Promise(function (resolve, reject) {
+                    if (!image || !image.complete || !image.naturalWidth) { reject(new Error('Foto belum selesai dimuat.')); return; }
+                    var canvas = document.createElement('canvas');
+                    var swap = degrees === 90 || degrees === 270;
+                    canvas.width = swap ? image.naturalHeight : image.naturalWidth;
+                    canvas.height = swap ? image.naturalWidth : image.naturalHeight;
+                    var context = canvas.getContext('2d');
+                    context.translate(canvas.width / 2, canvas.height / 2);
+                    context.rotate(degrees * Math.PI / 180);
+                    context.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
+                    var filename = item.getAttribute('data-photo-file') || '';
+                    var extension = filename.split('.').pop().toLowerCase();
+                    var mime = extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg';
+                    canvas.toBlob(function (blob) {
+                        if (!blob || blob.type !== mime) { reject(new Error('Format foto tidak didukung untuk rotasi.')); return; }
+                        body.append('rotated_file', blob, filename);
+                        resolve(fetch(save.getAttribute('data-save-url'), {method: 'POST', body: body, credentials: 'same-origin'}));
+                    }, mime, 0.9);
                 })
                     .then(function (response) { return response.json(); })
                     .then(function (payload) {
@@ -958,6 +1028,10 @@
                         scale = 1;
                         if (image) {
                             image.src = freshSrc;
+                        }
+                        if (download) {
+                            download.href = freshSrc;
+                            download.setAttribute('download', item.getAttribute('data-photo-file') || 'foto');
                         }
                         applyTransform();
                     })
@@ -1061,6 +1135,47 @@
         });
     }
 
+    function initBookingRetention() {
+        document.querySelectorAll('form[data-retention-submit]').forEach(function (form) {
+            var phraseInput = form.querySelector('[data-retention-phrase]');
+            var purgeButton = form.querySelector('[data-retention-purge-button]');
+            var expected = form.getAttribute('data-confirmation-phrase') || '';
+            var status = form.querySelector('[data-retention-status]');
+            function validatePhrase() {
+                if (!phraseInput) { return; }
+                var matches = phraseInput.value === expected;
+                phraseInput.setCustomValidity(matches ? '' : 'Ketik frasa konfirmasi persis seperti yang ditampilkan.');
+                if (purgeButton) { purgeButton.disabled = !matches; }
+            }
+            if (phraseInput) {
+                phraseInput.addEventListener('input', validatePhrase);
+                validatePhrase();
+            }
+            form.addEventListener('submit', function (event) {
+                if (form.getAttribute('data-retention-pending') === 'true') {
+                    event.preventDefault();
+                    return;
+                }
+                validatePhrase();
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    form.reportValidity();
+                    return;
+                }
+                form.setAttribute('data-retention-pending', 'true');
+                form.setAttribute('aria-busy', 'true');
+                form.querySelectorAll('button[type="submit"]').forEach(function (button) { button.disabled = true; });
+                if (status) { status.textContent = 'Memproses permintaan. Tunggu konfirmasi dari server.'; }
+            });
+        });
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted && document.querySelector('form[data-retention-pending="true"]')) {
+                window.location.reload();
+            }
+        });
+    }
+
+    initBookingRetention();
     initDynamicControls();
     initMetricCardFilters();
     initCharts();

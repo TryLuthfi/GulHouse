@@ -1,0 +1,155 @@
+DAFTAR REVISI GULHOUSE
+Diperbarui: 20 Oktober 2026
+Status: selesai di lokal dan QC PASS untuk cakupan revisi; belum deploy online.
+
+1. Master Booking - status tindak lanjut dan penyelesaian
+   - Follow-up menjadi Simpan Data (nama terbaru dari el, menggantikan usulan
+     Simpan Status).
+   - Rapikan area Aksi dan spinner/dropdown status agar susunan, jarak,
+     ukuran, serta kesejajaran kontrol jelas dan mudah digunakan.
+   - Rapikan tombol pada tabel booking: tinggi/padding konsisten, jarak
+     antartombol teratur, dan susunan responsif pada ponsel/tablet/desktop.
+   - Tambahkan tombol WhatsApp per baris booking untuk membuka tautan
+     https://wa.me/ dengan nomor WhatsApp yang diinput pada booking tersebut.
+   - Normalisasi nomor Indonesia untuk tautan: 0823... -> 62823...;
+     +628... -> 628...; +6208... / 6208... -> 628... (hapus nol trunk
+     setelah kode negara 62). Bersihkan spasi, tanda kurung dan tanda hubung.
+   - Nomor 628... yang sudah benar tidak ditambahi kode negara lagi.
+     Jangan mengubah nomor yang tersimpan hanya untuk membuat tautan.
+   - Jika nomor kosong/tidak valid, jangan buka tautan tujuan yang salah;
+     tampilkan kondisi tombol yang jelas. Klik hanya membuka WhatsApp,
+     tidak otomatis mengirim pesan atau mengubah status booking.
+   - Keputusan terbaru el menggantikan usulan Convert menjadi Buat Reservasi.
+   - Aksi Convert hanya mengubah status booking menjadi Done/Selesai untuk
+     menutup proses tindak lanjut booking yang telah selesai/deal.
+   - Label tombol yang disarankan: Tandai Selesai.
+   - Aksi ini tidak membuat atau mengubah data penghuni, reservasi, masa
+     tinggal, kontrak, tagihan, deposit, atau stok kamar.
+   - Booking batal tetap memakai status Batal, terpisah dari Done/Selesai.
+
+2. Pendaftaran penghuni menjadi jalur administrasi setelah deal
+   - Dari website: Form Booking Survey -> admin follow-up/survey -> deal ->
+     booking ditandai Done -> calon penghuni mengisi Daftar Penghuni.
+   - Datang langsung: survey/deal -> calon penghuni langsung mengisi Daftar
+     Penghuni, tanpa wajib membuat booking survey terlebih dahulu.
+   - Pemeriksaan identitas, reservasi, kontrak dan tagihan diproses melalui
+     Siklus Penghuni setelah pendaftaran; bukan dari aksi selesai booking.
+   - Kedua jalur memakai proses pendaftaran yang sama agar tidak membuat
+     penghuni dan reservasi melalui dua jalur pembuatan yang berbeda.
+   - Saat implementasi, pertahankan booking lama yang sudah dikonversi beserta
+     semua relasinya. Jangan menghapus atau mengubah data turunannya otomatis
+     saat memperkenalkan status Done yang tidak membuat data turunan.
+   - Periksa kompatibilitas status database, filter, antarmuka, API/mobile,
+     audit dan retensi; bedakan hasil konversi lama dari Done baru.
+   - Status: selesai di lokal; diverifikasi pada data sintetis.
+
+3. Halaman landing/resident/start - formulir Daftar Penghuni
+   - Hilangkan kolom Jalur survey dari formulir yang diisi calon penghuni.
+   - Pendaftaran publik melalui website dicatat otomatis sebagai website;
+     sumber tidak perlu dipilih oleh penghuni.
+   - Rapikan layout upload foto/scan KTP dan buku nikah: judul jelas, area
+     upload konsisten, nama file terpilih terbaca, dan rapi pada ponsel,
+     tablet maupun desktop.
+   - KTP tetap wajib; buku nikah tetap opsional. Pertahankan validasi berkas,
+     batas ukuran, penyimpanan privat dan pesan kesalahan yang ada.
+   - Status: selesai di lokal; diverifikasi pada data sintetis.
+
+4. Halaman master/lifecycle/detail - reservasi dan masa tinggal
+   - Koreksi terbaru el: batas periode awal otomatis satu bulan kalender
+     mengikuti tanggal sewa awal, menggantikan usulan +30 hari kalender.
+     Tanggal 29-31 dijepit ke akhir bulan bila perlu, lalu tanggal siklus
+     kembali mengikuti tanggal awal pada bulan yang memungkinkan.
+   - Bedakan batas periode/tagihan berikutnya dari checkout aktual; bukan
+     perintah keluar kamar atau pelepasan stok secara otomatis.
+   - Tanggal akhir tersebut tetap dapat diubah admin; validasi tanggal akhir
+     tidak sebelum tanggal masuk tetap berlaku.
+   - Harga sewa bulanan otomatis mengambil harga kamar yang ditempati dari
+     master kamar. Tidak dapat diedit di formulir reservasi lifecycle.
+   - Deposit otomatis mengikuti nilai deposit master kamar yang ditempati.
+     Tidak dapat diedit di formulir reservasi lifecycle.
+   - Saat implementasi, nilai harga/deposit ditentukan dan divalidasi ulang
+     di server, bukan hanya mengunci input pada tampilan. Simpan sebagai
+     nilai kesepakatan reservasi; jangan mengubah transaksi/kontrak lama
+     otomatis ketika harga master kemudian berubah.
+   - Tinjau dropdown Pilih masa tinggal yang kosong: kode sekarang mengambil
+     masa tinggal berstatus reserved yang sudah ada, bukan membuat pilihan
+     durasi sewa. Jika belum ada reservasi, tidak ada opsi untuk dipilih.
+   - Untuk pendaftaran baru, gunakan Buat reservasi & tagihan awal; alur ini
+     membuat serta menautkan masa tinggal. Rapikan penjelasan/kondisi kosong
+     agar admin tidak mengira dropdown ini wajib sebelum membuat reservasi.
+   - Penautan masa tinggal existing tetap memerlukan pemeriksaan hubungan
+     penghuni/kamar dan tidak boleh mengaitkan orang lain secara sembarang.
+   - Status: selesai di lokal; diverifikasi pada data sintetis.
+
+5. Halaman master/lifecycle/detail - Ubah Kamar Sebelum Check-in
+   - Sediakan aksi admin untuk mengganti kamar yang disepakati sebelum
+     check-in, misalnya 402 menjadi 403, baik atas permintaan penghuni
+     maupun pengelola. Catat alasan, konfirmasi penghuni, pelaku dan waktu.
+   - Sebelum reservasi: perbarui pilihan kamar pada pendaftaran yang sama;
+     harga sewa dan deposit mengikuti master kamar tujuan.
+   - Sesudah reservasi, sebelum check-in: periksa ketersediaan dan bentrok
+     tanggal kamar tujuan. Pindahkan reservasi secara atomik dan lepaskan
+     kamar asal hanya bila tidak ada pemakaian lain yang menghalangi.
+   - Selaraskan pendaftaran, masa tinggal, kontrak draft dan tagihan terkait
+     dengan kamar tujuan. Jangan membuat identitas penghuni kedua.
+   - Pembayaran sewa/deposit yang sudah masuk tetap tercatat; hitung selisih
+     harga/deposit secara eksplisit tanpa menghapus atau menimpa riwayat
+     transaksi. Jangan mencatat selisih sebagai transfer yang belum terjadi.
+   - Pertahankan jejak kamar asal dan perubahan yang dilakukan. Tinjau
+     dokumen/kontrak bertanda tangan bila sudah ada sebelum mengubahnya.
+   - Batasi fitur ini sebelum check-in. Perpindahan setelah masa tinggal aktif
+     merupakan alur pindah kamar terpisah dan bukan cakupan revisi ini.
+   - Status: selesai di lokal; diverifikasi pada data sintetis.
+
+6. Halaman master/lifecycle/detail - layout responsif dokumen privat
+   - Berdasarkan tangkapan layar el: tombol Lihat pada baris Buku nikah
+     menyempit hingga teks terpecah menjadi dua baris saat nama file panjang.
+   - Rapikan baris dokumen KTP dan buku nikah: area nama file fleksibel,
+     dapat membungkus nama panjang tanpa mendorong tombol keluar kartu.
+   - Tombol Lihat memiliki ukuran minimum konsisten, tidak menyusut, dan
+     teks tetap satu baris. Pada layar sempit, susun ulang baris bila perlu
+     dengan jarak dan target sentuh yang memadai.
+   - Periksa layout halaman detail secara keseluruhan pada ponsel, tablet,
+     dan desktop: kartu, form, tombol, serta tabel tidak meluber atau saling
+     bertumpuk. Tabel lebar memakai wadah scroll terkontrol bila diperlukan.
+   - Uji nama file panjang dan kedua jenis dokumen; pertahankan akses privat,
+     tautan dokumen, serta label dan fungsi tombol yang sudah ada.
+   - Status: selesai di lokal; diverifikasi pada data sintetis.
+
+7. Kebijakan pembayaran sewa, denda, dan penanganan tunggakan
+   - Sesuai Peraturan Kost poin6 dan konfirmasi terbaru el: pelunasan wajib
+     H-2 sebelum tanggal jatuh tempo/siklus sewa, mengikuti tanggal awal.
+   - Dua hari setelah jatuh tempo masih bebas denda. Mulai H+3 dikenakan
+     Rp100.000 per hari; tidak dihitung mundur sejak H+1.
+   - Contoh disetujui el: jatuh tempo20November, wajib lunas18November,
+     H+3/23November denda100.000, H+4/24November denda200.000.
+   - Jarak H-2 ke H+2 adalah empat hari sebelum denda mulai; ini bukan
+     toleransi empat hari setelah jatuh tempo dan bukan perubahan H-2.
+   - Catat pembayaran denda terpisah dari sewa/deposit; jangan menganggap
+     pembayaran denda sebagai pelunasan sewa atau transfer refund.
+   - Tunggakan H+7 masuk peninjauan take out oleh admin. Tidak ada pelepasan
+     kamar, checkout aktual atau penghapusan piutang otomatis oleh tanggal.
+   - Sediakan alur admin untuk meninjau/merencanakan checkout tunggakan tanpa
+     menunggu penghuni mengajukan notice sukarela. Checkout aktual tetap
+     memerlukan pemeriksaan fasilitas dan konfirmasi admin.
+   - Jika keluar dalam keadaan menunggak, piutang sewa/denda tetap tercatat;
+     bukan penghapusan utang atau pemotongan deposit otomatis.
+   - Kebijakan baru diberi versi dan diterapkan pada reservasi/tagihan baru
+     yang memenuhi syarat; jangan menambahkan biaya retroaktif pada tagihan
+     historis atau mengubah kontrak/pembayaran lama saat migrasi.
+   - Status: selesai di lokal; diverifikasi pada data sintetis.
+
+8. Satu akses Portal Penghuni dan Payment; pemulihan kode akses
+   - Login memakai nomor HP/WhatsApp terdaftar dan kode akses pribadi;
+     tidak meminta empat digit NIK lagi sebagai kunci pembayaran.
+   - Tagihan bulanan, transaksi dan layanan penghuni berada dalam portal
+     dengan satu sesi. Jalur Payment lama mengarah ke portal/login ini.
+   - Kode lama tidak dapat diambil kembali; hanya hash yang disimpan.
+     Super Admin dapat mereset setelah verifikasi identitas dan alasan.
+   - Kode baru ditampilkan sekali. Kode lama, sesi web lama dan token API
+     penghuni/pembayaran terkait dibatalkan; riwayat sewa/transaksi tetap.
+   - Pencatatan audit tidak memuat kode atau hash autentikasi.
+   - Sumber login React Native mengikuti nomor HP + kode akses; TypeScript
+     lulus. Tidak ada build APK atau deployment online dalam pekerjaan ini.
+   - Status: selesai di lokal; uji model dan HTTP/browser independen lulus.
+

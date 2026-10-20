@@ -1,0 +1,492 @@
+/* Shared admin presentation. Load after base and page stylesheets. */
+body.gh-admin-ui {
+    --admin-primary: #2563eb;
+    --admin-primary-hover: #1d4ed8;
+    --admin-control-ink: #334155;
+    --admin-control-border: #cbd5e1;
+    --admin-control-radius: 8px;
+    --forest: var(--admin-primary);
+}
+
+.gh-admin-ui .topbar {
+    position: static;
+}
+
+body.gh-admin-ui:not(.auth-page) {
+    overflow-x: visible;
+    font-size: 14px;
+}
+
+.gh-admin-ui .main-shell,
+.gh-admin-ui .panel,
+.gh-admin-ui .topbar > *,
+.gh-admin-ui .panel-head > *,
+.gh-admin-ui .manage-form,
+.gh-admin-ui .form-section,
+.gh-admin-ui .manage-form label,
+.gh-admin-ui .filter-form label {
+    min-width: 0;
+}
+
+.gh-admin-ui .manage-form label,
+.gh-admin-ui .filter-form label {
+    font-size: 13px;
+    line-height: 1.45;
+    font-weight: 600;
+    text-transform: none;
+}
+
+.gh-admin-ui .topbar,
+.gh-admin-ui .panel-head {
+    flex-wrap: wrap;
+}
+
+.gh-admin-ui .admin-chip,
+.gh-admin-ui .dashboard-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.gh-admin-ui .admin-chip > span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 4px;
+    color: #475569;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.gh-admin-ui .admin-chip {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.gh-admin-ui .dashboard-actions {
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.gh-admin-ui [data-logout-form] {
+    display: inline-flex;
+    margin: 0;
+}
+
+.gh-admin-ui .dashboard-icon-button,
+.gh-admin-ui [data-logout] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    color: #344054;
+    background: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.gh-admin-ui .dashboard-icon-button:hover,
+.gh-admin-ui [data-logout]:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+}
+
+.gh-admin-ui button,
+.gh-admin-ui .mini-link,
+.gh-admin-ui .table-action {
+    min-height: 44px;
+    max-width: 100%;
+    box-sizing: border-box;
+    font: inherit;
+}
+
+.gh-admin-ui .mini-link,
+.gh-admin-ui .table-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 14px;
+    line-height: 1.4;
+    text-align: center;
+    white-space: normal;
+}
+
+.gh-admin-ui .table-actions,
+.gh-admin-ui .form-actions,
+.gh-admin-ui .modal-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+}
+
+.gh-admin-ui .form-actions button {
+    min-width: 0;
+}
+
+.gh-admin-ui input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
+.gh-admin-ui select,
+.gh-admin-ui textarea {
+    min-width: 0;
+    min-height: 44px;
+    max-width: 100%;
+    font: inherit;
+}
+
+.gh-admin-ui input:not([readonly]):not(:disabled):not([type="checkbox"]):not([type="radio"]),
+.gh-admin-ui textarea:not([readonly]):not(:disabled),
+.gh-admin-ui select:not(:disabled) {
+    background-color: #fff;
+    color: #203b32;
+}
+
+.gh-admin-ui input[readonly],
+.gh-admin-ui textarea[readonly] {
+    background: #edf1ee;
+    color: #354c40;
+    border-color: #bac8be;
+    cursor: default;
+}
+
+.gh-admin-ui input:disabled,
+.gh-admin-ui textarea:disabled,
+.gh-admin-ui select:disabled {
+    background: #e5e9e6;
+    color: #657269;
+    border-color: #c7cfca;
+    cursor: not-allowed;
+}
+
+.gh-admin-ui button:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.gh-admin-ui input[type="file"] {
+    width: 100%;
+    padding: 8px;
+}
+
+.gh-admin-ui input[type="file"]::file-selector-button {
+    min-height: 40px;
+    margin-right: 8px;
+    padding: 8px 12px;
+    border: 1px solid #cbd5cf;
+    border-radius: 7px;
+    background: #fff;
+    color: #203b32;
+    font: inherit;
+}
+
+.gh-admin-ui :is(button, a, input, select, textarea, summary):focus-visible {
+    outline: 3px solid #487fff;
+    outline-offset: 3px;
+}
+
+.gh-admin-ui .filter-form:not(.payment-filter-form),
+.gh-admin-ui .photo-upload-form {
+    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+    align-items: end;
+    gap: 12px;
+}
+
+.gh-admin-ui .filter-form input,
+.gh-admin-ui .filter-form select,
+.gh-admin-ui .filter-form button,
+.gh-admin-ui .filter-form .mini-link {
+    width: 100%;
+}
+
+.gh-admin-ui .dashboard-title {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.gh-admin-ui .dashboard-search {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    flex: 1 1 300px;
+    min-width: 0;
+    max-width: 100%;
+    gap: 10px;
+    padding: 12px;
+}
+
+.gh-admin-ui .dashboard-search label {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.gh-admin-ui .dashboard-search label > span {
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.gh-admin-ui .dashboard-search input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.gh-admin-ui .dashboard-search button,
+.gh-admin-ui .modal-actions .admin-primary {
+    padding: 10px 16px;
+    border: 1px solid #487fff;
+    border-radius: 8px;
+    color: #fff;
+    background: #487fff;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.gh-admin-ui .modal-card {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.gh-admin-ui .modal:not([id^="bill-edit-"]) .modal-card.wide .form-section,
+.gh-admin-ui .manage-form:not(.sectioned).room-form,
+.gh-admin-ui .manage-form:not(.sectioned).tenant-form {
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+}
+
+.gh-admin-ui .modal-head {
+    align-items: flex-start;
+}
+
+.gh-admin-ui .modal-head h2 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.gh-admin-ui .modal-head [data-close-modal] {
+    flex: 0 0 44px;
+    width: 44px;
+    padding: 8px;
+}
+
+.gh-admin-ui .table-wrap,
+.gh-admin-ui .lc-table-wrap {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+}
+
+.gh-admin-ui .photo-category-tabs,
+.gh-admin-ui .lc-sticky-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.gh-admin-ui .lc .lc-sticky-links a,
+.gh-admin-ui .lc .lc-tabs a,
+.gh-admin-ui .lc .lc-form-footer > a,
+.gh-admin-ui .lc .lc-actions > a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid #dce5df;
+    border-radius: 8px;
+    background: #fff;
+    box-sizing: border-box;
+    line-height: 1.5;
+    text-decoration: none;
+}
+
+.gh-admin-ui .lc details > summary {
+    min-height: 44px;
+    padding: 10px 4px;
+    box-sizing: border-box;
+}
+
+.gh-admin-ui .panel-hint,
+.gh-admin-ui .notice,
+.gh-admin-ui .lc-alert,
+.gh-admin-ui .lc-timeline {
+    overflow-wrap: anywhere;
+}
+
+.gh-admin-ui .admin-nav-toggle {
+    display: none;
+}
+
+.gh-admin-ui[data-admin-nav-ready="true"] .lc-menu-toggle {
+    display: none !important;
+}
+
+@media (max-width: 980px) {
+    .gh-admin-ui[data-admin-nav-ready="true"] .admin-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-height: 44px;
+        margin: 16px 18px 0;
+        padding: 10px 16px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        color: #203b32;
+        background: #fff;
+        font: inherit;
+        font-weight: 700;
+    }
+
+    .gh-admin-ui[data-admin-nav-ready="true"][data-admin-navigation="closed"] .sidebar {
+        display: none;
+    }
+
+    .gh-admin-ui[data-admin-nav-ready="true"][data-admin-navigation="open"] .sidebar {
+        display: block;
+    }
+
+    .gh-admin-ui .main-shell {
+        margin-left: 0;
+        padding-top: 18px;
+    }
+
+    .gh-admin-ui .dashboard-title {
+        flex-basis: 100%;
+    }
+
+    .gh-admin-ui .dashboard-actions {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 680px) {
+    .gh-admin-ui .dashboard-actions .admin-chip {
+        flex-basis: 100%;
+    }
+
+    .gh-admin-ui .dashboard-actions .admin-chip,
+    .gh-admin-ui .topbar > .admin-chip {
+        justify-content: space-between;
+    }
+
+    .gh-admin-ui .topbar,
+    .gh-admin-ui .panel-head {
+        align-items: stretch;
+    }
+
+    .gh-admin-ui .dashboard-search {
+        flex-basis: auto;
+        width: 100%;
+    }
+
+    .gh-admin-ui .filter-form:not(.payment-filter-form),
+    .gh-admin-ui .photo-upload-form {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* Controls share one hierarchy; status badges retain their semantic colors. */
+.gh-admin-ui .mini-link,
+.gh-admin-ui .table-action,
+.gh-admin-ui .plain-button,
+.gh-admin-ui .danger-solid,
+.gh-admin-ui .manage-form button,
+.gh-admin-ui .filter-form button,
+.gh-admin-ui .photo-upload-form button,
+.gh-admin-ui .lc button,
+.gh-admin-ui .lc .lc-btn {
+    border-radius: var(--admin-control-radius);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.gh-admin-ui .mini-link:not(.danger),
+.gh-admin-ui .table-action:not(.danger),
+.gh-admin-ui .lc button.secondary,
+.gh-admin-ui .lc .lc-btn.secondary {
+    color: var(--admin-control-ink);
+    background: #fff;
+    border: 1px solid var(--admin-control-border);
+}
+
+.gh-admin-ui .mini-link:not(.danger):hover,
+.gh-admin-ui .table-action:not(.danger):hover,
+.gh-admin-ui .lc button.secondary:hover,
+.gh-admin-ui .lc .lc-btn.secondary:hover {
+    color: var(--admin-control-ink);
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+
+.gh-admin-ui .filter-form button:not(.danger):not(.danger-solid):not([data-close-modal]),
+.gh-admin-ui .manage-form button:not(.mini-link):not(.table-action):not(.danger):not(.danger-solid):not([data-close-modal]),
+.gh-admin-ui .manage-form button[type="submit"]:not(.danger):not(.danger-solid),
+.gh-admin-ui .photo-upload-form button:not(.danger),
+.gh-admin-ui .lc button:not(.secondary):not(.danger):not([data-logout]):not(.admin-nav-toggle):not(.lc-menu-toggle),
+.gh-admin-ui .lc .lc-btn:not(.secondary):not(.danger),
+.gh-admin-ui .dashboard-search button,
+.gh-admin-ui .modal-actions .admin-primary {
+    color: #fff;
+    background: var(--admin-primary);
+    border: 1px solid var(--admin-primary);
+}
+
+.gh-admin-ui .filter-form button:not(.danger):not(.danger-solid):not([data-close-modal]):hover,
+.gh-admin-ui .manage-form button:not(.mini-link):not(.table-action):not(.danger):not(.danger-solid):not([data-close-modal]):hover,
+.gh-admin-ui .manage-form button[type="submit"]:not(.danger):not(.danger-solid):hover,
+.gh-admin-ui .photo-upload-form button:not(.danger):hover,
+.gh-admin-ui .lc button:not(.secondary):not(.danger):not([data-logout]):not(.admin-nav-toggle):not(.lc-menu-toggle):hover,
+.gh-admin-ui .lc .lc-btn:not(.secondary):not(.danger):hover,
+.gh-admin-ui .dashboard-search button:hover,
+.gh-admin-ui .modal-actions .admin-primary:hover {
+    background: var(--admin-primary-hover);
+    border-color: var(--admin-primary-hover);
+}
+
+/* Only simple row actions stay together. The booking workflow keeps its layout. */
+.gh-admin-ui .table-wrap td > .table-actions:not(.booking-retention-actions) {
+    width: max-content;
+    max-width: none;
+    flex-wrap: nowrap;
+}
+
+.gh-admin-ui .table-wrap td > .table-actions:not(.booking-retention-actions) > .table-action {
+    flex: 0 0 auto;
+    max-width: none;
+    white-space: nowrap;
+}
+
+/* Keep empty-result guidance readable even when the table itself scrolls. */
+.gh-admin-ui .table-wrap .admin-empty-message {
+    display: block;
+    width: min(48ch, calc(100vw - 120px));
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 400;
+    text-transform: none;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+}

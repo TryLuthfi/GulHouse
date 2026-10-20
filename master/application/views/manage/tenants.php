@@ -109,27 +109,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261001-partial-metric'); ?>">
-</head>
-<body>
-    <aside class="sidebar">
-        <a class="brand" href="<?= base_url('dashboard'); ?>"><span>GH</span><strong>GUL HOUSE</strong></a>
-        <nav>
-            <a href="<?= base_url('dashboard'); ?>">Dashboard</a>
-            <a href="<?= base_url('properties'); ?>">Properti</a>
-            <a href="<?= base_url('room-types'); ?>">Tipe Kamar</a>
-            <a href="<?= base_url('rooms'); ?>">Kamar</a>
-            <a class="is-active" href="<?= base_url('tenants'); ?>">Penghuni</a>
-            <a href="<?= base_url('payments'); ?>">Pembayaran</a>
-            <a href="<?= base_url('photos'); ?>">Foto</a>
-            <a href="#">Booking</a>
-        </nav>
-    </aside>
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261020-admin-ui-1'); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script></head>
+<body class="gh-admin-ui">
+    <?php $this->load->view('partials/sidebar', array('active_menu' => 'tenants')); ?>
 
     <main class="main-shell">
         <header class="topbar">
             <div><p>Master Data</p><h1>Penghuni</h1></div>
-            <div class="admin-chip"><span><?= html_escape($admin_name); ?></span><a href="<?= base_url('logout'); ?>">Logout</a></div>
+            <div class="admin-chip"><span><?= html_escape($admin_name); ?></span><?php $this->load->view('partials/logout'); ?></div>
         </header>
 
         <?php if ($this->session->flashdata('success')): ?><div class="notice success"><?= html_escape($this->session->flashdata('success')); ?></div><?php endif; ?>
@@ -232,6 +220,7 @@
                                 </td>
                                 <td>
                                     <div class="table-actions">
+                                        <?php if ($row['tenant_id'] && in_array($row['stay_status'], array('active', 'reserved'), TRUE)): ?><button type="button" class="table-action" data-open-modal="#stay-contract-<?= (int) $row['id']; ?>">Draft Kontrak</button><?php endif; ?>
                                         <button type="button" class="table-action" data-open-modal="#tenant-edit-<?= (int) $row['id']; ?>">Edit</button>
                                         <?php if ($row['stay_status'] !== 'ended'): ?>
                                             <button type="button" class="table-action danger" data-delete-url="<?= base_url('tenants/end-stay/' . (int) $row['id']); ?>" data-delete-label="<?= html_escape($row['fullname'] ? $row['fullname'] : $row['source_unit_name']); ?>">Akhiri</button>
@@ -341,6 +330,16 @@
         </div>
     <?php endforeach; ?>
 
+    <?php foreach ($rows as $stay): if (! $stay['tenant_id'] || ! in_array($stay['stay_status'], array('active','reserved'), TRUE)) continue; ?>
+    <div class="modal wide" id="stay-contract-<?= (int) $stay['id']; ?>" aria-hidden="true"><div class="modal-backdrop" data-close-modal></div><section class="modal-card"><div class="modal-head"><h2>Draft Kontrak Penghuni Existing</h2><button type="button" data-close-modal>x</button></div>
+        <form class="manage-form" method="post" action="<?= base_url('operations/draft_contract_from_stay/' . (int) $stay['id']); ?>" data-confirm-submit>
+            <p>Draft tidak membuktikan kontrak telah ditandatangani. Lengkapi checklist dokumen dan verifikasi deposit sebelum aktivasi.</p>
+            <label>Mulai kontrak<input type="date" name="start_date" value="<?= html_escape((string) $stay['check_in_date']); ?>" required></label>
+            <label>Akhir kontrak<input type="date" name="end_date" value="<?= html_escape((string) $stay['check_out_date']); ?>" required></label>
+            <label>Tarif bulanan<input type="number" name="monthly_price" min="1" value="<?= (int) $stay['monthly_price']; ?>" required></label>
+            <label>Deposit<input type="number" name="deposit_amount" min="0" value="<?= (int) $stay['deposit']; ?>" required></label><button type="submit">Buat Draft Kontrak</button>
+        </form></section></div>
+    <?php endforeach; ?>
     <div class="modal confirm-modal" data-save-confirm-modal aria-hidden="true">
         <div class="modal-backdrop" data-close-modal></div>
         <section class="modal-card small">
@@ -359,6 +358,6 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js?v=20261001-partial-metric'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
 </body>
 </html>

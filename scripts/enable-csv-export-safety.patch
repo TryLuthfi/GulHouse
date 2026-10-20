@@ -1,0 +1,17 @@
+diff --git a/master/application/controllers/Operations.php b/master/application/controllers/Operations.php
+--- a/master/application/controllers/Operations.php
++++ b/master/application/controllers/Operations.php
+@@ -137,7 +137,12 @@ class Operations extends CI_Controller
+         foreach ($rows as $row) {
+             $line = array();
+             foreach (array_keys($config['columns']) as $field) {
+-                $line[] = isset($row[$field]) ? $row[$field] : '';
++                $value = isset($row[$field]) ? $row[$field] : '';
++                // Escape spreadsheet formulas in exported text; retain the original stored value.
++                if (is_string($value) && preg_match('/^[\x00-\x20\x7f\p{Z}\x{FEFF}]*[=+\-@]/u', $value)) {
++                    $value = "'" . $value;
++                }
++                $line[] = $value;
+             }
+             fputcsv($handle, $line);
+         }

@@ -6,6 +6,7 @@ class Home extends CI_Controller
     public function __construct()
     {
         parent::__construct();
+        $this->load->helper('contact');
         $this->load->model('Landing_model');
     }
 
@@ -102,15 +103,17 @@ class Home extends CI_Controller
 
     public function booking()
     {
-        $payload = array(
-            'fullname' => trim((string) $this->input->post('fullname', TRUE)),
-            'phone' => trim((string) $this->input->post('phone', TRUE)),
-            'room_interest' => trim((string) $this->input->post('room_interest', TRUE)),
-            'move_in_plan' => trim((string) $this->input->post('move_in_plan', TRUE)),
-            'message' => trim((string) $this->input->post('message', TRUE)),
-        );
+        $payload=array();$limits=array('fullname'=>150,'phone'=>64,'room_interest'=>150,'move_in_plan'=>60,'message'=>2000);
+        foreach($limits as $field=>$limit){$value=$this->input->post($field,TRUE);$payload[$field]=is_scalar($value)?trim((string)$value):'';}
 
         $saved = $this->Landing_model->save_booking_request($payload);
+        if($saved)$this->session->unset_userdata(array('booking_error','booking_error_field','booking_old'));
+        else {
+            $old=array();foreach($limits as $field=>$limit)$old[$field]=mb_substr($payload[$field],0,$limit);
+            $this->session->set_flashdata('booking_error',$this->Landing_model->get_booking_error()?:'Permintaan belum dapat disimpan. Periksa data booking lalu coba lagi.');
+            $this->session->set_flashdata('booking_error_field',$this->Landing_model->get_booking_error_field()?:'form');
+            $this->session->set_flashdata('booking_old',$old);
+        }
         $this->session->set_flashdata($saved ? 'success' : 'warning', $saved
             ? 'Terima kasih. Permintaan booking sudah kami terima.'
             : 'Permintaan belum tersimpan ke database, silakan hubungi WhatsApp GUL HOUSE.');
@@ -120,75 +123,60 @@ class Home extends CI_Controller
 
     public function payment()
     {
-        if ($this->session->userdata('gh_payment_access')) {
-            redirect(base_url('payment/status'));
-            return;
-        }
-
-        $data = array(
-            'title' => 'Cek Pembayaran | GUL HOUSE',
-        );
-
-        $this->load->view('payment_lookup', $data);
+        $this->load->model('Resident_access_model');
+        $this->output->set_header('Cache-Control: no-store');
+        redirect(base_url($this->Resident_access_model->current()?'resident/portal#tagihan':'resident/access'),'location',303);
     }
 
     public function payment_check()
     {
-        $phone = trim((string) $this->input->post('phone', TRUE));
-        $nikLast4 = trim((string) $this->input->post('nik_last4', TRUE));
-        $access = $this->Landing_model->find_tenant_payment_access($phone, $nikLast4);
-
-        if ( ! $access) {
-            $this->session->unset_userdata('gh_payment_access');
-            $this->session->set_flashdata('payment_warning', 'Data belum cocok. Pastikan nomor HP aktif penghuni dan 4 digit akhir NIK benar.');
-            redirect(base_url('payment'));
-            return;
-        }
-
-        $this->session->set_userdata('gh_payment_access', array(
-            'tenant_id' => (int) $access['tenant_id'],
-            'stay_id' => (int) $access['stay_id'],
-            'verified_at' => date('Y-m-d H:i:s'),
-        ));
-
-        redirect(base_url('payment/status'));
+        // Old HP/NIK form submissions never establish a payment session.
+        $this->session->unset_userdata('gh_payment_access');
+        $this->payment();
     }
 
     public function payment_status()
     {
-        $access = $this->session->userdata('gh_payment_access');
+        $this->payment();
+    }
 
-        if ( ! is_array($access) || empty($access['tenant_id']) || empty($access['stay_id'])) {
-            redirect(base_url('payment'));
-            return;
-        }
-
-        $context = $this->Landing_model->get_payment_context((int) $access['tenant_id'], (int) $access['stay_id']);
-
-        if ( ! $context) {
-            $this->session->unset_userdata('gh_payment_access');
-            $this->session->set_flashdata('payment_warning', 'Sesi pembayaran tidak valid lagi. Silakan cek ulang.');
-            redirect(base_url('payment'));
-            return;
-        }
-
-        $currentBill = $this->Landing_model->get_current_payment_bill($context);
-
-        $data = array(
-            'title' => 'Status Pembayaran | GUL HOUSE',
-            'context' => $context,
-            'current_bill' => $currentBill,
-            'bill_history' => $this->Landing_model->get_payment_bill_history($context, 8),
-            'payments' => ! empty($currentBill['id']) ? $this->Landing_model->get_bill_payments((int) $currentBill['id']) : array(),
-        );
-
-        $this->load->view('payment_status', $data);
+    public function complaint_submit()
+    {
+        if ($this->input->method(TRUE) !== 'POST') { show_error('Gunakan formulir komplain.', 405); return; }
+        $this->load->model('Resident_access_model');$case=$this->Resident_access_model->current();
+        if (!$case || empty($case['tenant_id']) || empty($case['stay_id'])) { redirect(base_url('resident/access'),'location',303);return; }
+        $context = $this->Landing_model->get_payment_context((int)$case['tenant_id'], (int)$case['stay_id']);
+        if (!$context || $context['stay_status'] !== 'active') { show_error('Komplain tersedia untuk penghuni aktif.',403); return; }
+        $payload = $this->input->post(NULL, TRUE);
+        $ok = $this->Landing_model->submit_resident_complaint($context, is_array($payload) ? $payload : array());
+        $this->session->set_flashdata($ok ? 'portal_success' : 'portal_error', $ok ? 'Komplain diterima. Pengelola akan menindaklanjuti tiket ini.' : 'Komplain belum tersimpan. Periksa judul dan detail.');
+        redirect(base_url('resident/portal#tagihan'),'location',303);
     }
 
     public function payment_logout()
     {
-        $this->session->unset_userdata('gh_payment_access');
-        redirect(base_url('payment'));
+        $this->load->model('Resident_access_model');$this->Resident_access_model->clear();
+        $this->session->sess_regenerate(TRUE);
+        redirect(base_url('resident/access'),'location',303);
+    }
+
+    public function house_rules()
+    {
+        $template = $this->Landing_model->get_house_rules_document();
+        if (! $template) {
+            show_404();
+            return;
+        }
+        $pdf = is_file($template['pdf_path']) ? file_get_contents($template['pdf_path'])
+            : $this->build_house_rules_pdf(preg_split('/\r\n|\r|\n/', trim($template['body_template'])));
+
+        $this->output
+            ->set_content_type('application/pdf')
+            ->set_header('X-Content-Type-Options: nosniff')
+            ->set_header('Content-Disposition: inline; filename="house_rules.pdf"')
+            ->set_header('Cache-Control: no-store, no-cache, must-revalidate')
+            ->set_header('Pragma: no-cache')
+            ->set_output($pdf);
     }
 
     public function room($slug = null)
@@ -263,6 +251,99 @@ class Home extends CI_Controller
     private function folder_key($value)
     {
         return preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $value));
+    }
+
+    private function build_house_rules_pdf(array $rules)
+    {
+        $content = array(
+            'q',
+            '1 1 1 rg 0 0 595 842 re f',
+            '0.04 0.09 0.12 rg',
+            'BT',
+            '/F2 24 Tf 72 770 Td (GUL HOUSE) Tj',
+            '/F1 11 Tf 0 -20 Td (Dokumen house_rules) Tj',
+            '/F2 18 Tf 0 -46 Td (Aturan Tinggal) Tj',
+            '/F1 11 Tf 0 -22 Td (Ringkasan aturan berikut menjadi acuan calon penghuni sebelum booking dan check-in.) Tj',
+            'ET',
+        );
+
+        $y = 670;
+        $number = 1;
+        foreach ($rules as $rule) {
+            $lines = $this->wrap_pdf_text((string) $rule, 78);
+            $firstLine = true;
+
+            foreach ($lines as $line) {
+                $prefix = $firstLine ? ($number . '. ') : '   ';
+                $content[] = 'BT /F1 11 Tf 92 ' . $y . ' Td (' . $this->escape_pdf_text($prefix . $line) . ') Tj ET';
+                $y -= 18;
+                $firstLine = false;
+            }
+
+            $y -= 8;
+            $number++;
+        }
+
+        $content[] = 'BT /F1 9 Tf 72 82 Td (Dokumen ini digenerate otomatis dari template house_rules GUL HOUSE.) Tj ET';
+        $content[] = 'Q';
+
+        $stream = implode("\n", $content);
+        return $this->compose_pdf($stream);
+    }
+
+    private function compose_pdf($stream)
+    {
+        $objects = array();
+        $objects[] = '<< /Type /Catalog /Pages 2 0 R >>';
+        $objects[] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
+        $objects[] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>';
+        $objects[] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+        $objects[] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>';
+        $objects[] = '<< /Length ' . strlen($stream) . " >>\nstream\n" . $stream . "\nendstream";
+
+        $pdf = "%PDF-1.4\n";
+        $offsets = array(0);
+
+        foreach ($objects as $index => $object) {
+            $offsets[] = strlen($pdf);
+            $pdf .= ($index + 1) . " 0 obj\n" . $object . "\nendobj\n";
+        }
+
+        $xrefOffset = strlen($pdf);
+        $pdf .= "xref\n0 " . (count($objects) + 1) . "\n";
+        $pdf .= "0000000000 65535 f \n";
+
+        for ($i = 1; $i <= count($objects); $i++) {
+            $pdf .= sprintf("%010d 00000 n \n", $offsets[$i]);
+        }
+
+        $pdf .= "trailer\n<< /Size " . (count($objects) + 1) . " /Root 1 0 R >>\n";
+        $pdf .= "startxref\n" . $xrefOffset . "\n%%EOF";
+
+        return $pdf;
+    }
+
+    private function wrap_pdf_text($text, $limit)
+    {
+        $text = trim(preg_replace('/\s+/', ' ', $text));
+        if ($text === '') {
+            return array('');
+        }
+
+        return explode("\n", wordwrap($text, $limit, "\n", true));
+    }
+
+    private function escape_pdf_text($text)
+    {
+        if (function_exists('iconv')) {
+            $converted = @iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', $text);
+            if ($converted !== false) {
+                $text = $converted;
+            }
+        }
+
+        $text = preg_replace('/[^\x09\x0A\x0D\x20-\x7E]/', '', $text);
+        return str_replace(array('\\', '(', ')'), array('\\\\', '\\(', '\\)'), $text);
     }
 
     private function fallback_slider_images()

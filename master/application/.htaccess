@@ -1,0 +1,7 @@
+# Application configuration, sessions, logs and resident documents are private.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Deny from all
+</IfModule>

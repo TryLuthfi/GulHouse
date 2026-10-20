@@ -71,31 +71,21 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261001-partial-metric'); ?>">
-</head>
-<body>
-    <aside class="sidebar">
-        <a class="brand" href="<?= base_url('dashboard'); ?>"><span>GH</span><strong>GUL HOUSE</strong></a>
-        <nav>
-            <a href="<?= base_url('dashboard'); ?>">Dashboard</a>
-            <a href="<?= base_url('properties'); ?>">Properti</a>
-            <a href="<?= base_url('room-types'); ?>">Tipe Kamar</a>
-            <a href="<?= base_url('rooms'); ?>">Kamar</a>
-            <a href="<?= base_url('tenants'); ?>">Penghuni</a>
-            <a class="is-active" href="<?= base_url('payments'); ?>">Pembayaran</a>
-            <a href="<?= base_url('photos'); ?>">Foto</a>
-            <a href="#">Booking</a>
-        </nav>
-    </aside>
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261020-admin-ui-1'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/payments-layout.css?v=20261020-4'); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script></head>
+<body class="gh-admin-ui">
+    <?php $this->load->view('partials/sidebar', array('active_menu' => 'payments')); ?>
 
     <main class="main-shell">
         <header class="topbar">
             <div><p>Master Data</p><h1>Pembayaran</h1></div>
-            <div class="admin-chip"><span><?= html_escape($admin_name); ?></span><a href="<?= base_url('logout'); ?>">Logout</a></div>
+            <div class="admin-chip"><span><?= html_escape($admin_name); ?></span><?php $this->load->view('partials/logout'); ?></div>
         </header>
 
         <?php if ($this->session->flashdata('success')): ?><div class="notice success"><?= html_escape($this->session->flashdata('success')); ?></div><?php endif; ?>
         <?php if ($this->session->flashdata('error')): ?><div class="notice error"><?= html_escape($this->session->flashdata('error')); ?></div><?php endif; ?>
+        <?php if ($this->session->flashdata('warning')): ?><div class="notice warning"><?= html_escape($this->session->flashdata('warning')); ?></div><?php endif; ?>
 
         <section class="metric-grid">
             <a class="metric-card" href="<?= base_url('payments'); ?>"><span>Total Bill</span><strong><?= number_format((int) $summary['bills'], 0, ',', '.'); ?></strong></a>
@@ -204,9 +194,12 @@
                                 </td>
                                 <td>
                                     <div class="table-actions">
-                                        <button type="button" class="table-action" data-open-modal="#bill-edit-<?= (int) $row['id']; ?>">Bill</button>
-                                        <button type="button" class="table-action" data-open-modal="#payment-edit-<?= (int) $row['id']; ?>-<?= (int) $row['payment_id']; ?>"><?= $row['payment_id'] ? 'Edit Bayar' : 'Tambah Bayar'; ?></button>
+                                        <button type="button" class="table-action" data-open-modal="#bill-edit-<?= (int) $row['id']; ?>">Rincian Bill</button>
+                                        <button type="button" class="table-action" data-open-modal="#payment-add-<?= (int) $row['id']; ?>">Tambah Transaksi</button>
+                                        <?php if ($row['payment_id']): ?><button type="button" class="table-action" data-open-modal="#payment-edit-<?= (int) $row['id']; ?>-<?= (int) $row['payment_id']; ?>">Edit Catatan</button><?php endif; ?>
                                         <?php if ($row['payment_id']): ?>
+                                            <a class="table-action" href="<?= base_url('operations/print_receipt/' . (int) $row['payment_id']); ?>">Kuitansi</a>
+                                            <a class="table-action" href="<?= base_url('paymentproofs/index/' . (int) $row['payment_id']); ?>">Bukti Transfer</a>
                                             <button type="button" class="table-action danger" data-delete-url="<?= base_url('payments/delete-payment/' . (int) $row['payment_id'] . '?' . http_build_query($filters)); ?>" data-delete-label="pembayaran <?= html_escape($row['room_label'] . ' ' . $row['period_label']); ?>">Hapus</button>
                                         <?php endif; ?>
                                     </div>
@@ -238,79 +231,84 @@
             <div class="modal wide" id="bill-edit-<?= (int) $row['id']; ?>" aria-hidden="true">
                 <div class="modal-backdrop" data-close-modal></div>
                 <section class="modal-card wide">
-                    <div class="modal-head"><h2>Edit Bill <?= html_escape($row['room_label']); ?></h2><button type="button" data-close-modal>x</button></div>
-                    <form class="manage-form payment-form sectioned" method="post" action="<?= base_url('payments/save-bill'); ?>" data-confirm-submit>
-                        <input type="hidden" name="bill_id" value="<?= (int) $row['id']; ?>">
-                        <?php foreach ($filters as $key => $value): ?><input type="hidden" name="<?= html_escape($key); ?>" value="<?= html_escape($value); ?>"><?php endforeach; ?>
-                        <div class="form-section">
-                            <h3 class="form-section-title">Referensi Bill</h3>
-                            <label>Periode<input type="text" value="<?= html_escape($row['period_label']); ?>" disabled></label>
-                            <label>Kamar<input type="text" value="<?= html_escape($row['room_label']); ?>" disabled></label>
-                            <label>Tanggal JT<input type="date" name="due_date" value="<?= html_escape((string) $row['due_date']); ?>"></label>
-                            <label>Status
-                                <select name="bill_status">
-                                    <?php foreach ($billStatuses as $value => $label): if ($value === '') continue; ?>
-                                        <option value="<?= html_escape($value); ?>" <?= $row['bill_status'] === $value ? 'selected' : ''; ?>><?= html_escape($label); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </label>
+                    <div class="modal-head"><h2>Rincian Bill <?= html_escape($row['room_label']); ?></h2><button type="button" data-close-modal aria-label="Tutup rincian tagihan">×</button></div>
+                    <p class="panel-hint">Rincian tagihan hanya dapat dilihat. Tagihan baru mengikuti alur otomatis.</p>
+                    <div class="manage-form payment-form sectioned">
+                        <div class="form-section"><h3 class="form-section-title">Identitas tagihan</h3>
+                            <label>Periode<input readonly value="<?= html_escape($row['period_label']); ?>"></label>
+                            <label>Kamar<input readonly value="<?= html_escape($row['property_code'].' · '.$row['room_label']); ?>"></label>
+                            <label>Penghuni<input readonly value="<?= html_escape($row['tenant_name_snapshot'] ?: '-'); ?>"></label>
+                            <label>Jatuh tempo<input readonly value="<?= html_escape($row['due_date'] ?: $row['due_date_text'] ?: '-'); ?>"></label>
+                            <label>Status<input readonly value="<?= html_escape(isset($billStatuses[$row['bill_status']])?$billStatuses[$row['bill_status']]:$row['bill_status']); ?>"></label>
                         </div>
-                        <div class="form-section">
-                            <h3 class="form-section-title">Nominal Tagihan</h3>
-                            <label>Harga Dasar<input type="text" name="base_price" inputmode="numeric" value="<?= html_escape(gh_money_input($row['base_price'])); ?>" placeholder="Rp 2.500.000" data-money-input></label>
-                            <label>Deposit<input type="text" name="deposit_amount" inputmode="numeric" value="<?= html_escape(gh_money_input($row['deposit_amount'])); ?>" placeholder="Rp 1.000.000" data-money-input></label>
-                            <label>Total Terbayar<input type="text" name="paid_total" inputmode="numeric" value="<?= html_escape(gh_money_input($row['paid_total'])); ?>" placeholder="Rp 2.500.000" data-money-input></label>
-                            <label>Sudah JT<input type="text" name="past_due_amount" inputmode="numeric" value="<?= html_escape(gh_money_input($row['past_due_amount'])); ?>" placeholder="Rp 0" data-money-input></label>
-                            <label>Belum JT<input type="text" name="future_due_amount" inputmode="numeric" value="<?= html_escape(gh_money_input($row['future_due_amount'])); ?>" placeholder="Rp 0" data-money-input></label>
+                        <div class="form-section"><h3 class="form-section-title">Rincian nominal</h3>
+                            <label>Sewa pada tagihan<input readonly value="<?= html_escape(gh_money($row['base_price'])); ?>"></label>
+                            <label>Deposit pada tagihan<input readonly value="<?= html_escape(gh_money($row['deposit_amount'])); ?>"></label>
+                            <label>Total sewa terbayar<input readonly value="<?= html_escape(gh_money($row['paid_total'])); ?>"></label>
+                            <label>Sewa sudah jatuh tempo<input readonly value="<?= html_escape(gh_money($row['past_due_amount'])); ?>"></label>
+                            <label>Sewa belum jatuh tempo<input readonly value="<?= html_escape(gh_money($row['future_due_amount'])); ?>"></label>
+                            <p class="panel-hint full">Deposit dicatat saat reservasi awal. Tagihan bulanan baru tidak menagih ulang deposit. Nilai deposit pada tagihan lama tetap ditampilkan sesuai riwayat.</p>
+                            <label class="full">Catatan tagihan<textarea readonly rows="3"><?= html_escape((string)$row['notes']); ?></textarea></label>
                         </div>
-                        <div class="form-section">
-                            <h3 class="form-section-title">Catatan</h3>
-                            <label class="full">Catatan<textarea name="notes" rows="3"><?= html_escape((string) $row['notes']); ?></textarea></label>
-                        </div>
-                        <div class="form-actions"><button type="submit">Simpan Bill</button></div>
-                    </form>
+                    </div>
                 </section>
             </div>
         <?php endif; ?>
 
+        <?php if (!empty($row['payment_id'])): ?>
         <div class="modal wide" id="payment-edit-<?= (int) $row['id']; ?>-<?= (int) $row['payment_id']; ?>" aria-hidden="true">
             <div class="modal-backdrop" data-close-modal></div>
             <section class="modal-card wide">
-                <div class="modal-head"><h2><?= $row['payment_id'] ? 'Edit Pembayaran' : 'Tambah Pembayaran'; ?> <?= html_escape($row['room_label']); ?></h2><button type="button" data-close-modal>x</button></div>
+                <div class="modal-head"><h2>Catatan Pembayaran <?= html_escape($row['room_label']); ?></h2><button type="button" data-close-modal aria-label="Tutup catatan pembayaran">×</button></div>
+                <p class="panel-hint">Nilai dan rincian transaksi lama tetap tersimpan. Hanya catatan yang dapat diubah melalui formulir ini.</p>
                 <form class="manage-form payment-form sectioned" method="post" action="<?= base_url('payments/save-payment'); ?>" data-confirm-submit>
-                    <input type="hidden" name="payment_id" value="<?= (int) $row['payment_id']; ?>">
-                    <input type="hidden" name="room_bill_id" value="<?= (int) $row['id']; ?>">
-                    <?php foreach ($filters as $key => $value): ?><input type="hidden" name="<?= html_escape($key); ?>" value="<?= html_escape($value); ?>"><?php endforeach; ?>
-                    <div class="form-section">
-                        <h3 class="form-section-title">Referensi Pembayaran</h3>
-                        <label>Periode<input type="text" value="<?= html_escape($row['period_label']); ?>" disabled></label>
-                        <label>Kamar<input type="text" value="<?= html_escape($row['room_label']); ?>" disabled></label>
+                    <input type="hidden" name="payment_id" value="<?= (int)$row['payment_id']; ?>">
+                    <input type="hidden" name="room_bill_id" value="<?= (int)$row['id']; ?>">
+                    <input type="hidden" name="request_key" value="<?= bin2hex(random_bytes(16)); ?>">
+                    <?php foreach ($filters as $key=>$value): ?><input type="hidden" name="<?= html_escape($key); ?>" value="<?= html_escape($value); ?>"><?php endforeach; ?>
+                    <div class="form-section"><h3 class="form-section-title">Riwayat transaksi</h3>
+                        <label>Invoice<input readonly value="<?= html_escape('#'.$row['id'].' · '.$row['period_label'].' · '.$row['room_label']); ?>"></label>
+                        <label>Nominal tercatat<input readonly value="<?= html_escape(gh_money($row['payment_amount'])); ?>"></label>
+                        <label>Jenis pembayaran<input readonly value="<?= html_escape($row['payment_type']==='rent'?'Sewa':($row['payment_type']==='deposit'?'Deposit':'Lainnya')); ?>"></label>
+                        <label>Metode tercatat<input readonly value="<?= html_escape((string)$row['method']); ?>"></label>
+                        <label>Tanggal pembayaran<input readonly value="<?= html_escape($row['payment_date'] ?: $row['payment_date_text'] ?: '-'); ?>"></label>
+                        <div class="full"><strong>Referensi transaksi lama</strong><p class="panel-hint"><?= html_escape($row['reference_no'] ?: 'Tidak ada referensi'); ?></p></div>
+                        <label class="full">Catatan<textarea name="notes" rows="3"><?= html_escape((string)$row['payment_notes']); ?></textarea></label>
                     </div>
-                    <div class="form-section">
-                        <h3 class="form-section-title">Detail Transaksi</h3>
-                        <label>Tanggal Bayar<input type="date" name="payment_date" value="<?= html_escape((string) $row['payment_date']); ?>"></label>
-                        <label>Teks Tanggal<input type="text" name="payment_date_text" value="<?= html_escape((string) $row['payment_date_text']); ?>" placeholder="26-Sep"></label>
-                        <label>Nilai<input type="text" name="amount" inputmode="numeric" required value="<?= html_escape(gh_money_input($row['payment_amount'])); ?>" placeholder="Rp 2.500.000" data-money-input></label>
-                        <label>Tipe
-                            <select name="payment_type">
-                                <?php foreach (array('rent' => 'Sewa', 'deposit' => 'Deposit', 'other' => 'Lainnya') as $value => $label): ?>
-                                    <option value="<?= $value; ?>" <?= $row['payment_type'] === $value ? 'selected' : ''; ?>><?= $label; ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label>Metode<input type="text" name="method" value="<?= html_escape((string) $row['method']); ?>" placeholder="Transfer/Cash"></label>
-                        <label>Referensi<input type="text" name="reference_no" value="<?= html_escape((string) $row['reference_no']); ?>"></label>
-                    </div>
-                    <div class="form-section">
-                        <h3 class="form-section-title">Catatan</h3>
-                        <label class="full">Catatan<textarea name="notes" rows="3"><?= html_escape((string) $row['payment_notes']); ?></textarea></label>
-                    </div>
-                    <div class="form-actions"><button type="submit">Simpan Pembayaran</button></div>
+                    <div class="form-actions"><button type="submit">Simpan Catatan</button></div>
                 </form>
             </section>
         </div>
+        <?php endif; ?>
     <?php endforeach; ?>
 
+    <?php $addBills = array(); foreach ($rows as $paymentBill): if (isset($addBills[$paymentBill['id']])) continue; $addBills[$paymentBill['id']] = TRUE;
+        $settlementQuote = isset($payment_quotes[(int)$paymentBill['id']]) && is_array($payment_quotes[(int)$paymentBill['id']]) ? $payment_quotes[(int)$paymentBill['id']] : array();
+        $canPayRent = !empty($settlementQuote['can_pay_rent']) && (string)$settlementQuote['can_pay_rent'] !== '0';
+        $canPayDeposit = !empty($settlementQuote['can_pay_deposit']) && (string)$settlementQuote['can_pay_deposit'] !== '0';
+        $settlementType = $canPayRent ? 'rent' : ($canPayDeposit ? 'deposit' : 'rent');
+        $settlementAmount = max(0,(int)(isset($settlementQuote[$settlementType.'_remaining'])?$settlementQuote[$settlementType.'_remaining']:0));
+        $settlementAvailable = !empty($settlementQuote[$settlementType.'_available']) && (string)$settlementQuote[$settlementType.'_available'] !== '0';
+        $canSettle = !empty($settlementQuote) && $settlementAvailable && $settlementAmount>0 && ($settlementType==='rent'?$canPayRent:$canPayDeposit);
+        $settlementMessage = empty($settlementQuote) ? 'Rincian pembayaran belum tersedia. Muat ulang halaman.' : (!$settlementAvailable ? (isset($settlementQuote[$settlementType.'_reason']) ? $settlementQuote[$settlementType.'_reason'] : 'Pembayaran belum tersedia untuk invoice ini.') : ($settlementAmount===0 ? 'Sudah lunas. Tidak ada sisa pembayaran untuk jenis ini.' : ($canSettle ? 'Nominal mengikuti sisa pembayaran yang tercatat.' : 'Pembayaran belum tersedia untuk invoice ini.')));
+    ?>
+    <div class="modal wide" id="payment-add-<?= (int)$paymentBill['id']; ?>" aria-hidden="true"><div class="modal-backdrop" data-close-modal></div><section class="modal-card"><div class="modal-head"><h2>Tambah Pembayaran <?= html_escape($paymentBill['room_label']); ?></h2><button type="button" data-close-modal aria-label="Tutup tambah pembayaran">×</button></div>
+        <form class="manage-form sectioned" method="post" action="<?= base_url('payments/save-payment'); ?>" data-confirm-submit data-payment-settlement data-settlement-quote="<?= html_escape(json_encode($settlementQuote)); ?>">
+            <input type="hidden" name="payment_id" value="0"><input type="hidden" name="room_bill_id" value="<?= (int)$paymentBill['id']; ?>"><input type="hidden" name="request_key" value="<?= bin2hex(random_bytes(16)); ?>">
+            <?php foreach($filters as $key=>$value): ?><input type="hidden" name="<?= html_escape($key); ?>" value="<?= html_escape($value); ?>"><?php endforeach; ?>
+            <div class="form-section"><h3 class="form-section-title">Pembayaran Transfer</h3>
+                <p class="panel-hint full">Nominal diisi otomatis sesuai sisa pembayaran jenis yang dipilih. Catat hanya setelah transfer benar-benar diterima.</p>
+                <label>Periode / invoice<input readonly value="<?= html_escape($paymentBill['period_label'].' · #'.$paymentBill['id']); ?>"></label>
+                <label>Tanggal bayar<input type="date" name="payment_date" value="<?= (new DateTimeImmutable('now',new DateTimeZone('Asia/Jakarta')))->format('Y-m-d'); ?>" required></label>
+                <label>Jenis pembayaran<select name="payment_type" required data-settlement-type><option value="rent" <?= $settlementType==='rent'?'selected':''; ?>>Sewa</option><option value="deposit" <?= $settlementType==='deposit'?'selected':''; ?>>Deposit</option></select></label>
+                <label>Nominal sisa pembayaran<input type="text" name="amount" required readonly aria-readonly="true" data-settlement-amount value="<?= html_escape(gh_money_input($settlementAmount)); ?>"></label>
+                <input type="hidden" name="method" value="Transfer"><label>Metode<input readonly value="Transfer"></label>
+                <label class="full">Catatan<textarea name="notes" rows="3"></textarea></label>
+                <input type="hidden" name="payment_date_text" value="">
+                <p class="panel-hint full" role="status" data-settlement-status><?= html_escape($settlementMessage); ?></p>
+            </div><div class="form-actions"><button type="submit" data-settlement-save <?= $canSettle?'':'disabled'; ?>>Simpan Pembayaran</button></div>
+        </form></section></div>
+    <?php endforeach; ?>
     <div class="modal confirm-modal" data-save-confirm-modal aria-hidden="true">
         <div class="modal-backdrop" data-close-modal></div>
         <section class="modal-card small">
@@ -329,6 +327,7 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js?v=20261001-partial-metric'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/payment-settlement.js?v=20261020-1'); ?>"></script>
 </body>
 </html>

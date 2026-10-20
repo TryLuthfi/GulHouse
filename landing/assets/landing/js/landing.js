@@ -308,54 +308,55 @@
             return;
         }
 
-        var slides = Array.prototype.slice.call(carousel.querySelectorAll('[data-carousel-slide]'));
+        var slides = [];
         var dots = [];
 
         function slideWidth() {
             return slides[0] ? slides[0].getBoundingClientRect().width + 18 : carousel.clientWidth;
         }
 
-        function activeIndex() {
-            return Math.round(carousel.scrollLeft / slideWidth());
-        }
-
         function updateDots() {
-            var index = activeIndex();
+            var index = Math.max(0, Math.min(slides.length - 1, Math.round(carousel.scrollLeft / Math.max(1, slideWidth()))));
             dots.forEach(function (dot, dotIndex) {
                 dot.classList.toggle('is-active', dotIndex === index);
+                dot.setAttribute('aria-pressed', dotIndex === index ? 'true' : 'false');
             });
+            if (prev) { prev.disabled = slides.length <= 1 || carousel.scrollLeft <= 1; }
+            if (next) { next.disabled = slides.length <= 1 || carousel.scrollLeft + carousel.clientWidth >= carousel.scrollWidth - 1; }
         }
 
-        if (dotsWrap) {
-            slides.forEach(function (_, index) {
-                var dot = document.createElement('button');
-                dot.type = 'button';
-                dot.setAttribute('aria-label', 'Lihat kamar ' + (index + 1));
-                dot.addEventListener('click', function () {
-                    carousel.scrollTo({ left: slideWidth() * index, behavior: 'smooth' });
+        function refreshSlides() {
+            slides = Array.prototype.slice.call(carousel.querySelectorAll('[data-carousel-slide]')).filter(function (slide) {
+                return !slide.classList.contains('is-hidden');
+            });
+            dots = [];
+            carousel.scrollLeft = 0;
+            if (dotsWrap) {
+                dotsWrap.textContent = '';
+                slides.forEach(function (slide, index) {
+                    var dot = document.createElement('button');
+                    dot.type = 'button';
+                    var heading = slide.querySelector('h3');
+                    dot.setAttribute('aria-label', 'Lihat ' + (heading ? heading.textContent : 'kamar ' + (index + 1)));
+                    dot.addEventListener('click', function () {
+                        carousel.scrollTo({ left: slideWidth() * index, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+                    });
+                    dotsWrap.appendChild(dot);
+                    dots.push(dot);
                 });
-                dotsWrap.appendChild(dot);
-                dots.push(dot);
-            });
+            }
+            updateDots();
         }
-
         if (prev) {
-            prev.addEventListener('click', function () {
-                carousel.scrollBy({ left: -slideWidth(), behavior: 'smooth' });
-            });
+            prev.addEventListener('click', function () { carousel.scrollBy({ left: -slideWidth(), behavior: prefersReducedMotion ? 'auto' : 'smooth' }); });
         }
-
         if (next) {
-            next.addEventListener('click', function () {
-                carousel.scrollBy({ left: slideWidth(), behavior: 'smooth' });
-            });
+            next.addEventListener('click', function () { carousel.scrollBy({ left: slideWidth(), behavior: prefersReducedMotion ? 'auto' : 'smooth' }); });
         }
-
-        carousel.addEventListener('scroll', function () {
-            window.requestAnimationFrame(updateDots);
-        }, { passive: true });
-
-        updateDots();
+        carousel.addEventListener('scroll', function () { window.requestAnimationFrame(updateDots); }, { passive: true });
+        carousel.addEventListener('roomfilterchange', refreshSlides);
+        window.addEventListener('resize', updateDots);
+        refreshSlides();
     }
 
     function initAccordion() {
@@ -593,6 +594,8 @@
             button.addEventListener('click', function () {
                 openModal(parseInt(button.getAttribute('data-gallery-open'), 10) || 0);
             });
+            button.disabled = false;
+            button.setAttribute('data-gallery-ready', 'true');
         });
 
         modal.querySelectorAll('[data-photo-close]').forEach(function (button) {
@@ -625,6 +628,7 @@
     function initRoomFilter() {
         var filter = document.querySelector('[data-room-filter]');
         var cards = Array.prototype.slice.call(document.querySelectorAll('[data-room-card]'));
+        var groups = Array.prototype.slice.call(document.querySelectorAll('[data-room-group]'));
         var empty = document.querySelector('[data-room-empty]');
 
         if (!filter || !cards.length) {
@@ -649,15 +653,30 @@
             empty.setAttribute('aria-hidden', visibleCards.length === 0 ? 'false' : 'true');
         }
 
+        function updateGroups() {
+            groups.forEach(function (group) {
+                var visibleCards = Array.prototype.slice.call(group.querySelectorAll('[data-room-card]')).filter(function (card) {
+                    return !card.classList.contains('is-hidden');
+                });
+
+                group.classList.toggle('is-hidden', visibleCards.length === 0);
+            });
+        }
+
         function applyFilters() {
             cards.forEach(function (card) {
                 var statusMatch = state.status === 'all' || card.getAttribute('data-status') === state.status;
                 var propertyMatch = state.property === 'all' || card.getAttribute('data-property') === state.property;
                 var typeMatch = state.type === 'all' || card.getAttribute('data-type') === state.type;
-                card.classList.toggle('is-hidden', !(statusMatch && propertyMatch && typeMatch));
+                var matches = statusMatch && propertyMatch && typeMatch;
+                card.classList.toggle('is-hidden', !matches);
+                card.setAttribute('aria-hidden', matches ? 'false' : 'true');
             });
 
+            updateGroups();
             updateEmptyState();
+            var carousel = document.querySelector('[data-carousel]');
+            if (carousel) { carousel.dispatchEvent(new Event('roomfilterchange')); }
         }
 
         filter.querySelectorAll('button[data-filter-field]').forEach(function (button) {
@@ -674,114 +693,62 @@
 
                 (group || filter).querySelectorAll('button[data-filter-field="' + field + '"]').forEach(function (item) {
                     item.classList.toggle('is-active', item === button);
+                    item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
                 });
 
                 applyFilters();
             });
         });
 
+        filter.querySelectorAll('button[data-filter-field]').forEach(function (button) {
+            button.setAttribute('aria-pressed', button.classList.contains('is-active') ? 'true' : 'false');
+        });
         applyFilters();
     }
 
-    function initMapSwitcher() {
-        var switcher = document.querySelector('[data-map-switcher]');
-        var tabs = Array.prototype.slice.call(document.querySelectorAll('[data-map-tab]'));
-
-        if (!switcher || !tabs.length) {
-            return;
-        }
-
-        var panels = Array.prototype.slice.call(switcher.querySelectorAll('[data-map-panel]'));
-        var canvas = switcher.querySelector('[data-map-canvas]');
-        var map = null;
-        var markers = {};
-
-        function setActive(code) {
-            tabs.forEach(function (tab) {
-                var active = tab.getAttribute('data-map-tab') === code;
-                tab.classList.toggle('is-active', active);
-                tab.setAttribute('aria-selected', active ? 'true' : 'false');
-            });
-
-            panels.forEach(function (panel) {
-                panel.classList.toggle('is-active', panel.getAttribute('data-map-panel') === code);
-            });
-
-            if (map && markers[code]) {
-                map.flyTo(markers[code].getLatLng(), 18, {
-                    animate: !prefersReducedMotion,
-                    duration: .8
-                });
-                markers[code].openPopup();
-            }
-        }
-
-        tabs.forEach(function (tab) {
-            tab.addEventListener('click', function () {
-                setActive(tab.getAttribute('data-map-tab'));
-            });
-        });
-
-        if (canvas && window.L && panels.length) {
-            map = window.L.map(canvas, {
-                scrollWheelZoom: false,
-                zoomControl: true
-            });
-
-            window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '&copy; OpenStreetMap'
-            }).addTo(map);
-
-            var bounds = [];
-
-            panels.forEach(function (panel) {
-                var code = panel.getAttribute('data-map-panel');
-                var name = panel.querySelector('strong') ? panel.querySelector('strong').textContent : code;
-                var lat = parseFloat(panel.getAttribute('data-map-lat'));
-                var lng = parseFloat(panel.getAttribute('data-map-lng'));
-
-                if (!code || Number.isNaN(lat) || Number.isNaN(lng)) {
-                    return;
-                }
-
-                var icon = window.L.divIcon({
-                    className: '',
-                    html: '<div class="map-marker"><span>' + code.replace(' ', '') + '</span></div>',
-                    iconSize: [42, 42],
-                    iconAnchor: [21, 42],
-                    popupAnchor: [0, -36]
-                });
-
-                markers[code] = window.L.marker([lat, lng], { icon: icon })
-                    .addTo(map)
-                    .bindPopup('<strong>' + name + '</strong>');
-                bounds.push([lat, lng]);
-            });
-
-            if (bounds.length > 1) {
-                map.fitBounds(bounds, { padding: [72, 72], maxZoom: 18 });
-            } else if (bounds.length === 1) {
-                map.setView(bounds[0], 18);
-            }
-
-            window.setTimeout(function () {
-                map.invalidateSize();
-            }, 300);
-        }
-
-        setActive(tabs[0].getAttribute('data-map-tab'));
-    }
-
-    function initPaymentModal() {
-        var modal = document.querySelector('[data-payment-modal]');
-        var triggers = Array.prototype.slice.call(document.querySelectorAll('[data-payment-open]'));
+    function initBookingModal() {
+        var modal = document.querySelector('[data-booking-modal]');
+        var triggers = Array.prototype.slice.call(document.querySelectorAll('[data-booking-open]'));
 
         if (!modal || !triggers.length) {
             return;
         }
 
-        var firstInput = modal.querySelector('input[name="phone"]');
+        var firstInput = modal.querySelector('input[name="fullname"]');
+        var errorTarget = modal.querySelector('[aria-invalid="true"]') || modal.querySelector('#booking-error-message');
+        var phoneInput = modal.querySelector('[data-booking-phone]');
+        if (phoneInput) {
+            function sanitizePhone() {
+                var caret = phoneInput.selectionStart;
+                var beforeCaret = typeof caret === 'number' ? phoneInput.value.slice(0, caret).replace(/[^0-9]/g, '').length : null;
+                phoneInput.value = phoneInput.value.replace(/[^0-9]/g, '').slice(0, 15);
+                if (beforeCaret !== null) { phoneInput.setSelectionRange(beforeCaret, beforeCaret); }
+            }
+            phoneInput.addEventListener('input', sanitizePhone);
+            phoneInput.addEventListener('paste', function (event) {
+                var clipboard = event.clipboardData;
+                if (!clipboard) { return; }
+                event.preventDefault();
+                var digits = clipboard.getData('text').replace(/[^0-9]/g, '');
+                var start = phoneInput.selectionStart === null ? phoneInput.value.length : phoneInput.selectionStart;
+                var end = phoneInput.selectionEnd === null ? start : phoneInput.selectionEnd;
+                var remaining = Math.max(0, 15 - (phoneInput.value.length - (end - start)));
+                var inserted = digits.slice(0, remaining);
+                phoneInput.value = phoneInput.value.slice(0, start) + inserted + phoneInput.value.slice(end);
+                phoneInput.setSelectionRange(start + inserted.length, start + inserted.length);
+                phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+            sanitizePhone();
+        }
+        var roomSelect = modal.querySelector('select[name="room_interest"]');
+        if (roomSelect) {
+            function validateRoomSelection() {
+                var selected = roomSelect.options[roomSelect.selectedIndex];
+                roomSelect.setCustomValidity(selected && selected.disabled ? 'Pilihan sebelumnya tidak tersedia. Pilih kamar atau tipe yang tersedia.' : '');
+            }
+            roomSelect.addEventListener('change', validateRoomSelection);
+            validateRoomSelection();
+        }
 
         function openModal(event) {
             if (event) {
@@ -793,8 +760,9 @@
             document.body.style.overflow = 'hidden';
 
             window.setTimeout(function () {
-                if (firstInput) {
-                    firstInput.focus();
+                var focusTarget = modal.hasAttribute('data-booking-error') ? errorTarget : firstInput;
+                if (focusTarget) {
+                    focusTarget.focus();
                 }
             }, 80);
         }
@@ -809,7 +777,7 @@
             trigger.addEventListener('click', openModal);
         });
 
-        modal.querySelectorAll('[data-payment-close]').forEach(function (button) {
+        modal.querySelectorAll('[data-booking-close]').forEach(function (button) {
             button.addEventListener('click', closeModal);
         });
 
@@ -818,13 +786,80 @@
                 closeModal();
             }
         });
+
+        if (modal.hasAttribute('data-booking-error')) {
+            openModal();
+        }
     }
 
-    setHeaderState();
-    window.addEventListener('scroll', setHeaderState, { passive: true });
-    initPageProgress();
-    initScrollSpy();
-    initMobileMenu();
+    function initScrollTop() {
+        var triggers = Array.prototype.slice.call(document.querySelectorAll('[data-scroll-top]'));
+
+        triggers.forEach(function (trigger) {
+            trigger.addEventListener('click', function (event) {
+                event.preventDefault();
+                window.scrollTo({
+                    top: 0,
+                    behavior: prefersReducedMotion ? 'auto' : 'smooth'
+                });
+            });
+        });
+    }
+
+    function initMapSwitcher() {
+        var switcher = document.querySelector('[data-map-switcher]');
+        var tabs = Array.prototype.slice.call(document.querySelectorAll('[data-map-tab]'));
+
+        if (!switcher || !tabs.length) {
+            return;
+        }
+
+        var panels = Array.prototype.slice.call(switcher.querySelectorAll('[data-map-panel]'));
+        var views = Array.prototype.slice.call(switcher.querySelectorAll('[data-map-view]'));
+
+        function setActive(code) {
+            tabs.forEach(function (tab) {
+                var active = tab.getAttribute('data-map-tab') === code;
+                tab.classList.toggle('is-active', active);
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
+                tab.setAttribute('tabindex', active ? '0' : '-1');
+            });
+
+            panels.forEach(function (panel) {
+                panel.classList.toggle('is-active', panel.getAttribute('data-map-panel') === code);
+            });
+
+            views.forEach(function (view) {
+                var active = view.getAttribute('data-map-view') === code;
+                view.hidden = !active;
+                var frame = view.querySelector('iframe[data-map-src]');
+                if (active && frame) {
+                    frame.src = frame.getAttribute('data-map-src');
+                    frame.removeAttribute('data-map-src');
+                }
+            });
+        }
+
+        tabs.forEach(function (tab, index) {
+            tab.addEventListener('click', function () {
+                setActive(tab.getAttribute('data-map-tab'));
+            });
+            tab.addEventListener('keydown', function (event) {
+                var next = index;
+                if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+                else if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+                else if (event.key === 'Home') next = 0;
+                else if (event.key === 'End') next = tabs.length - 1;
+                else return;
+                event.preventDefault();
+                setActive(tabs[next].getAttribute('data-map-tab'));
+                tabs[next].focus();
+            });
+        });
+
+        setActive(tabs[0].getAttribute('data-map-tab'));
+    }
+
     initReveal();
     initParallax();
     initHeroSlider();
@@ -835,5 +870,7 @@
     initPhotoModal();
     initRoomFilter();
     initMapSwitcher();
-    initPaymentModal();
+    initBookingModal();
+    initScrollTop();
+    document.documentElement.setAttribute('data-landing-ready', 'true');
 }());

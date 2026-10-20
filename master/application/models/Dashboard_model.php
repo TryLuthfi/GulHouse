@@ -3,16 +3,45 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Dashboard_model extends CI_Model
 {
+    private $selected_period = null;
+
+    public function set_period($period)
+    {
+        $valid = function ($value) {
+            return preg_match('/^(\d{4})-(0[1-9]|1[0-2])$/', (string) $value, $parts) && checkdate((int) $parts[2], 1, (int) $parts[1]);
+        };
+        if ($valid($period)) {
+            $this->selected_period = $period;
+        } elseif ($valid(getenv('GULHOUSE_REPORT_PERIOD'))) {
+            $this->selected_period = getenv('GULHOUSE_REPORT_PERIOD');
+        } else {
+            $currentMonth = (new DateTime('now', new DateTimeZone('Asia/Jakarta')))->format('Y-m');
+            $latest = $this->db->table_exists('gh_billing_periods')
+                ? $this->db->select('period_key')->where('period_key <=', $currentMonth)->order_by('period_key', 'DESC')->limit(1)->get('gh_billing_periods')->row_array() : null;
+            $this->selected_period = $latest && $valid($latest['period_key']) ? $latest['period_key'] : $currentMonth;
+        }
+        return $this->selected_period;
+    }
+
+    private function selected_billing_period()
+    {
+        if ($this->selected_period === null) $this->set_period(null);
+        return $this->db->where('period_key', $this->selected_period)->get('gh_billing_periods')->row_array();
+    }
+
     public function get_summary()
     {
+        if ($this->selected_period === null) $this->set_period(null);
+        $latestPeriod = $this->db->table_exists('gh_billing_periods') ? $this->db->select('period_key')->order_by('period_key', 'DESC')->limit(1)->get('gh_billing_periods')->row_array() : null;
         $summary = array(
+            'latest_data_period' => $latestPeriod ? $latestPeriod['period_key'] : '-',
             'properties' => 0,
             'rooms' => 0,
             'available' => 0,
             'bookings' => 0,
             'monthly_potential' => 0,
             'payment_revenue' => 0,
-            'payment_period' => '-',
+            'payment_period' => $this->selected_period,
             'payment_count' => 0,
             'unpaid_bills' => 0,
             'occupied' => 0,
@@ -28,6 +57,14 @@ class Dashboard_model extends CI_Model
             'outstanding_amount' => 0,
             'collection_rate' => 0,
             'import_issues' => 0,
+            'contracts_expiring' => 0,
+            'maintenance_open' => 0,
+            'complaints_open' => 0,
+            'facility_open' => 0,
+            'audit_open' => 0,
+            'operational_expenses' => 0,
+            'deposit_balance' => 0,
+            'deposit_issues' => 0,
         );
 
         if ($this->db->table_exists('gh_properties')) {
@@ -42,6 +79,7 @@ class Dashboard_model extends CI_Model
                 ->select('SUM(CASE WHEN status = "reserved" THEN 1 ELSE 0 END) AS reserved', FALSE)
                 ->select('SUM(CASE WHEN status = "mess" THEN 1 ELSE 0 END) AS internal', FALSE)
                 ->select('SUM(CASE WHEN status = "maintenance" THEN 1 ELSE 0 END) AS maintenance', FALSE)
+                ->select('SUM(CASE WHEN monthly_price > 0 AND status IN ("available","occupied","reserved") THEN 1 ELSE 0 END) AS rentable', FALSE)
                 ->select('SUM(CASE WHEN monthly_price IS NOT NULL AND status IN ("available","occupied","reserved") THEN monthly_price ELSE 0 END) AS monthly_potential', FALSE)
                 ->get('gh_rooms')
                 ->row_array();
@@ -53,8 +91,8 @@ class Dashboard_model extends CI_Model
             $summary['internal'] = (int) $row['internal'];
             $summary['maintenance'] = (int) $row['maintenance'];
             $summary['monthly_potential'] = (int) $row['monthly_potential'];
-            $sellableRooms = max(0, $summary['rooms'] - $summary['internal'] - $summary['maintenance']);
-            $summary['occupancy_rate'] = $sellableRooms > 0 ? (int) round((($summary['occupied'] + $summary['reserved']) / $sellableRooms) * 100) : 0;
+            $sellableRooms = (int) $row['rentable'];
+            $summary['occupancy_rate'] = $sellableRooms > 0 ? (int) round(($summary['occupied'] / $sellableRooms) * 100) : 0;
         }
 
         if ($this->db->table_exists('gh_room_types')) {
@@ -63,20 +101,17 @@ class Dashboard_model extends CI_Model
 
         if ($this->db->table_exists('gh_tenant_stays')) {
             $summary['active_tenants'] = (int) $this->db
-                ->where_in('stay_status', array('active', 'reserved', 'internal'))
+                ->where('stay_status', 'active')
                 ->count_all_results('gh_tenant_stays');
         }
 
         if ($this->db->table_exists('gh_booking_requests')) {
+            if($this->db->field_exists('archived_at','gh_booking_requests')) $this->db->where('archived_at',NULL);
             $summary['bookings'] = (int) $this->db->where('status', 'new')->count_all_results('gh_booking_requests');
         }
 
         if ($this->db->table_exists('gh_payments') && $this->db->table_exists('gh_billing_periods')) {
-            $period = $this->db
-                ->order_by('period_key', 'DESC')
-                ->limit(1)
-                ->get('gh_billing_periods')
-                ->row_array();
+            $period = $this->selected_billing_period();
 
             if ($period) {
                 $summary['payment_period'] = $period['period_label'];
@@ -84,6 +119,7 @@ class Dashboard_model extends CI_Model
                     ->select('COUNT(pay.id) AS payment_count, COALESCE(SUM(pay.amount), 0) AS payment_revenue', FALSE)
                     ->from('gh_payments pay')
                     ->join('gh_room_bills rb', 'rb.id = pay.room_bill_id')
+                    ->where('pay.payment_type', 'rent')
                     ->where('rb.period_id', (int) $period['id'])
                     ->get()
                     ->row_array();
@@ -91,6 +127,7 @@ class Dashboard_model extends CI_Model
                 $summary['payment_revenue'] = $row ? (int) $row['payment_revenue'] : 0;
                 $summary['payment_total_all'] = (int) $this->db
                     ->select('COALESCE(SUM(amount), 0) AS total', FALSE)
+                    ->where('payment_type', 'rent')
                     ->get('gh_payments')
                     ->row()
                     ->total;
@@ -103,11 +140,13 @@ class Dashboard_model extends CI_Model
                     ->select('COALESCE(SUM(paid_total), 0) AS paid_total', FALSE)
                     ->from('gh_room_bills')
                     ->where('period_id', (int) $period['id'])
+                    ->where_in('bill_status', array('unpaid', 'partial', 'paid', 'overpaid'))
+                    ->select('COALESCE(SUM(GREATEST(CAST(base_price AS DECIMAL(20,0))-CAST(paid_total AS DECIMAL(20,0)),0)),0) AS outstanding', FALSE)
                     ->get()
                     ->row_array();
                 $summary['latest_bill_total'] = $billRow ? (int) $billRow['bill_total'] : 0;
                 $summary['latest_bill_paid'] = $billRow ? (int) $billRow['paid_total'] : 0;
-                $summary['outstanding_amount'] = max(0, $summary['latest_bill_total'] - $summary['latest_bill_paid']);
+                $summary['outstanding_amount'] = $billRow ? (int) $billRow['outstanding'] : 0;
                 $summary['collection_rate'] = $summary['latest_bill_total'] > 0
                     ? (int) round(($summary['latest_bill_paid'] / $summary['latest_bill_total']) * 100)
                     : 0;
@@ -116,6 +155,52 @@ class Dashboard_model extends CI_Model
 
         if ($this->db->table_exists('gh_payment_import_issues')) {
             $summary['import_issues'] = (int) $this->db->count_all_results('gh_payment_import_issues');
+        }
+
+        if ($this->db->table_exists('gh_contracts')) {
+            $summary['contracts_expiring'] = (int) $this->db
+                ->where_in('status', array('active', 'expiring'))
+                ->where('end_date IS NOT NULL', null, FALSE)
+                ->where('end_date >=', date('Y-m-d'))
+                ->where('end_date <=', date('Y-m-d', strtotime('+30 days')))
+                ->count_all_results('gh_contracts');
+        }
+
+        if ($this->db->table_exists('gh_maintenance_tickets')) {
+            $summary['maintenance_open'] = (int) $this->db->where_in('status', array('open', 'assigned', 'in_progress'))->count_all_results('gh_maintenance_tickets');
+        }
+
+        if ($this->db->table_exists('gh_complaints')) {
+            $summary['complaints_open'] = (int) $this->db->where_in('status', array('open', 'in_progress'))->count_all_results('gh_complaints');
+        }
+
+        if ($this->db->table_exists('gh_facility_checks')) {
+            $summary['facility_open'] = (int) $this->db->where_in('followup_status', array('open', 'in_progress'))->count_all_results('gh_facility_checks');
+        }
+
+        if ($this->db->table_exists('gh_monthly_audits')) {
+            $summary['audit_open'] = (int) $this->db->where_in('status', array('open', 'in_progress'))->count_all_results('gh_monthly_audits');
+        }
+
+        if ($this->db->table_exists('gh_expenses')) {
+            $row = $this->db->select('COALESCE(SUM(amount), 0) AS total', FALSE)->where('payment_status', 'paid')->where('expense_date >=', $this->selected_period . '-01')->where('expense_date <', date('Y-m-d', strtotime($this->selected_period . '-01 +1 month')))->get('gh_expenses')->row_array();
+            $summary['operational_expenses'] = $row ? (int) $row['total'] : 0;
+        }
+
+        if ($this->db->table_exists('gh_deposit_transactions')) {
+            $depositRows = $this->db
+                ->select('COALESCE(SUM(CASE WHEN transaction_type IN ("received","adjustment") THEN amount ELSE 0 END), 0) AS received', FALSE)
+                ->select('COALESCE(SUM(CASE WHEN transaction_type IN ("deduction","refund") THEN amount ELSE 0 END), 0) AS out_amount', FALSE)
+                ->group_by('COALESCE(stay_id, CONCAT("tenant-", tenant_id, "-room-", room_id))', FALSE)
+                ->get('gh_deposit_transactions')
+                ->result_array();
+            foreach ($depositRows as $depositRow) {
+                $balance = (int) $depositRow['received'] - (int) $depositRow['out_amount'];
+                $summary['deposit_balance'] += $balance;
+                if ($balance < 0) {
+                    $summary['deposit_issues']++;
+                }
+            }
         }
 
         return $summary;
@@ -166,6 +251,7 @@ class Dashboard_model extends CI_Model
             return array();
         }
 
+        if($this->db->field_exists('archived_at','gh_booking_requests')) $this->db->where('archived_at',NULL);
         return $this->db
             ->order_by('created_at', 'DESC')
             ->limit(6)
@@ -175,6 +261,7 @@ class Dashboard_model extends CI_Model
 
     public function get_charts()
     {
+        if ($this->selected_period === null) $this->set_period(null);
         return array(
             'revenue_by_property' => $this->chart_revenue_by_property(),
             'rooms_by_status' => $this->chart_rooms_by_status(),
@@ -218,6 +305,7 @@ class Dashboard_model extends CI_Model
             ->join('gh_billing_periods bp', 'bp.id = rb.period_id')
             ->join('gh_rooms r', 'r.id = rb.room_id')
             ->join('gh_properties p', 'p.id = r.property_id', 'left')
+            ->where('bp.period_key', $this->selected_period)
             ->order_by('COALESCE(pay.payment_date, pay.created_at)', 'DESC', FALSE)
             ->limit(8)
             ->get()
@@ -291,7 +379,8 @@ class Dashboard_model extends CI_Model
             ->select('bp.period_label AS label, COALESCE(SUM(pay.amount), 0) AS value', FALSE)
             ->from('gh_billing_periods bp')
             ->join('gh_room_bills rb', 'rb.period_id = bp.id', 'left')
-            ->join('gh_payments pay', 'pay.room_bill_id = rb.id', 'left')
+            ->join('gh_payments pay', 'pay.room_bill_id = rb.id AND pay.payment_type = "rent"', 'left')
+            ->where('bp.period_key <=', $this->selected_period)
             ->group_by('bp.id')
             ->order_by('bp.period_key', 'ASC')
             ->get()
@@ -306,11 +395,7 @@ class Dashboard_model extends CI_Model
             return array('labels' => array(), 'values' => array());
         }
 
-        $period = $this->db
-            ->order_by('period_key', 'DESC')
-            ->limit(1)
-            ->get('gh_billing_periods')
-            ->row_array();
+        $period = $this->selected_billing_period();
 
         if ( ! $period) {
             return array('labels' => array(), 'values' => array());
@@ -365,11 +450,12 @@ class Dashboard_model extends CI_Model
 
         $rows = $this->db
             ->select('bp.period_label AS label', FALSE)
-            ->select('COALESCE(SUM(rb.base_price), 0) AS billed', FALSE)
-            ->select('COALESCE(SUM(rb.paid_total), 0) AS paid', FALSE)
-            ->select('GREATEST(COALESCE(SUM(rb.base_price), 0) - COALESCE(SUM(rb.paid_total), 0), 0) AS outstanding', FALSE)
+            ->select('COALESCE(SUM(CASE WHEN rb.bill_status IN ("paid","partial","unpaid","overpaid") THEN rb.base_price ELSE 0 END), 0) AS billed', FALSE)
+            ->select('COALESCE(SUM(CASE WHEN rb.bill_status IN ("paid","partial","unpaid","overpaid") THEN rb.paid_total ELSE 0 END), 0) AS paid', FALSE)
+            ->select('COALESCE(SUM(CASE WHEN rb.bill_status IN ("paid","partial","unpaid","overpaid") THEN GREATEST(CAST(rb.base_price AS DECIMAL(20,0))-CAST(rb.paid_total AS DECIMAL(20,0)),0) ELSE 0 END),0) AS outstanding', FALSE)
             ->from('gh_billing_periods bp')
             ->join('gh_room_bills rb', 'rb.period_id = bp.id', 'left')
+            ->where('bp.period_key <=', $this->selected_period)
             ->group_by('bp.id')
             ->order_by('bp.period_key', 'ASC')
             ->get()
@@ -424,6 +510,7 @@ class Dashboard_model extends CI_Model
             return array('labels' => array(), 'values' => array());
         }
 
+        if($this->db->field_exists('archived_at','gh_booking_requests')) $this->db->where('archived_at',NULL);
         $rows = $this->db
             ->select('status AS label, COUNT(id) AS value', FALSE)
             ->from('gh_booking_requests')

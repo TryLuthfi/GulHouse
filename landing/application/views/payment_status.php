@@ -55,7 +55,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20260912-payment'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20261019-landing-ui-r2'); ?>">
 </head>
 <body class="payment-page">
     <header class="payment-header">
@@ -65,8 +65,9 @@
         </a>
         <nav aria-label="Navigasi payment">
             <a href="<?= base_url(); ?>">Landing</a>
-            <a href="<?= base_url('payment/logout'); ?>">Cek penghuni lain</a>
-            <a href="https://wa.me/6280000000000" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="<?= base_url('resident/access'); ?>">Portal Penghuni</a>
+            <form method="post" action="<?= base_url('payment/logout'); ?>" style="display:inline"><button type="submit">Cek penghuni lain</button></form>
+            <a href="<?= html_escape(gh_contact_url()); ?>" target="_blank" rel="noopener"><?= html_escape(gh_contact_label()); ?></a>
         </nav>
     </header>
 
@@ -93,6 +94,10 @@
         </section>
 
         <section class="payment-summary-grid">
+            <form method="get" action="<?= base_url('payment/status'); ?>" class="payment-card">
+                <label>Periode tagihan <input type="month" name="period" value="<?= html_escape($bill['period_key']); ?>" required></label>
+                <button type="submit">Tampilkan periode</button>
+            </form>
             <div class="payment-card payment-metric">
                 <span>Tagihan</span>
                 <strong><?= gh_payment_money($bill['base_price']); ?></strong>
@@ -160,6 +165,7 @@
                             <tr>
                                 <th>Tanggal</th>
                                 <th>Nominal</th>
+                                <th>Jenis</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -168,11 +174,12 @@
                                     <tr>
                                         <td><?= html_escape(gh_payment_date($payment['payment_date'], $payment['payment_date_text'] ? $payment['payment_date_text'] : '-')); ?></td>
                                         <td><?= gh_payment_money($payment['amount']); ?></td>
+                                        <td><?= html_escape($payment['payment_type'] === 'rent' ? 'Sewa' : ($payment['payment_type'] === 'deposit' ? 'Deposit' : 'Lainnya')); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="2">Belum ada pembayaran tercatat untuk periode ini.</td>
+                                    <td colspan="3">Belum ada pembayaran tercatat untuk periode ini.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
@@ -182,6 +189,40 @@
                     Pembayaran online via DOKU belum diaktifkan. Untuk koreksi status atau bukti transfer, hubungi admin GUL HOUSE melalui WhatsApp.
                 </div>
             </aside>
+        </section>
+        <section class="payment-history-grid" aria-label="Portal penghuni">
+            <div class="payment-table-card">
+                <div class="payment-table-head"><h2>Kontrak dan deposit</h2><a href="<?= base_url('documents/house_rules'); ?>" target="_blank" rel="noopener">Tata tertib</a></div>
+                <div class="payment-table-wrap"><table class="payment-table">
+                    <thead><tr><th>Kontrak</th><th>Masa sewa</th><th>Status</th><th>Tarif</th></tr></thead>
+                    <tbody><?php foreach ($portal['contracts'] as $contract): ?><tr>
+                        <td><?= html_escape($contract['contract_no']); ?></td>
+                        <td><?= html_escape(gh_payment_date($contract['start_date']) . ' — ' . gh_payment_date($contract['end_date'])); ?></td>
+                        <td><?= html_escape($contract['status']); ?></td><td><?= gh_payment_money($contract['monthly_price']); ?></td>
+                    </tr><?php endforeach; ?><?php if (!$portal['contracts']): ?><tr><td colspan="4">Kontrak digital belum dicatat pengelola.</td></tr><?php endif; ?></tbody>
+                </table></div>
+                <div class="payment-note">Saldo deposit tercatat: <strong><?= gh_payment_money($portal['deposit_balance']); ?></strong>. Deposit disimpan terpisah dari pembayaran sewa.</div>
+                <div class="payment-table-wrap"><table class="payment-table"><thead><tr><th>Dokumen administrasi</th><th>Status</th></tr></thead><tbody>
+                    <?php foreach ($portal['documents'] as $document): ?><tr><td><?= html_escape($document['document_title']); ?></td><td><?= html_escape($document['status']); ?></td></tr><?php endforeach; ?>
+                </tbody></table></div>
+            </div>
+            <div class="payment-table-card">
+                <div class="payment-table-head"><h2>Komplain penghuni</h2></div>
+                <?php if ($message = $this->session->flashdata('portal_success')): ?><p role="status"><?= html_escape($message); ?></p><?php endif; ?>
+                <?php if ($message = $this->session->flashdata('portal_error')): ?><p role="alert"><?= html_escape($message); ?></p><?php endif; ?>
+                <?php if ($context['stay_status'] === 'active'): ?>
+                <form method="post" action="<?= base_url('resident/complaints'); ?>" style="display:grid;gap:12px;padding:20px">
+                    <label>Kategori <select name="category"><option value="facility">Fasilitas</option><option value="noise">Kebisingan</option><option value="billing">Tagihan</option><option value="security">Keamanan</option><option value="cleanliness">Kebersihan</option><option value="other">Lainnya</option></select></label>
+                    <label>Judul komplain <input name="complaint_title" required maxlength="180" style="width:100%"></label>
+                    <label>Detail <textarea name="complaint_detail" rows="3" maxlength="3000" style="width:100%"></textarea></label>
+                    <button type="submit">Kirim komplain</button>
+                </form>
+                <?php endif; ?>
+                <div class="payment-table-wrap"><table class="payment-table"><thead><tr><th>Tiket</th><th>Komplain</th><th>Status</th></tr></thead><tbody>
+                    <?php foreach ($portal['complaints'] as $complaint): ?><tr><td><?= html_escape($complaint['ticket_no']); ?></td><td><?= html_escape($complaint['complaint_title']); ?></td><td><?= html_escape($complaint['status']); ?></td></tr><?php endforeach; ?>
+                    <?php if (!$portal['complaints']): ?><tr><td colspan="3">Belum ada komplain.</td></tr><?php endif; ?>
+                </tbody></table></div>
+            </div>
         </section>
     </main>
 </body>

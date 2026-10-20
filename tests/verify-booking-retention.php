@@ -1,0 +1,87 @@
+<?php
+// Actual isolated transactions, model code, graph and encrypted backup. Never touches real occupants.
+require dirname(__DIR__).'/scripts/booking-retention-bootstrap.php';
+$runtime=json_decode(file_get_contents($root.'/.e2e/mobile/bookingretain26/runtime.json'),TRUE);
+if(!preg_match('/^gulhouse_test_mobile_bookingretain26_[0-9_]+$/D',$runtime['schema']??''))throw new RuntimeException('Owned isolated runtime required.');
+list($m,$db)=booking_retention_cli($runtime['schema']);
+$m->config=new class {function item($key){return $key==='encryption_key'?'Synthetic-Retention-Only-Key-20261020-NoRealData!':NULL;}};
+require APPPATH.'models/Operations_model.php';$ops=new Operations_model();$ops->db=$db;
+$checks=0;function brcheck($ok,$name){global $checks;if(!$ok)throw new RuntimeException('FAIL '.$name);$checks++;echo 'PASS '.$name.PHP_EOL;}
+function rejects($fn,$name){try{$fn();}catch(Throwable $e){brcheck(TRUE,$name);return;}brcheck(FALSE,$name);}
+$suffix=bin2hex(random_bytes(6));
+$db->insert('gh_admin_users',array('fullname'=>'Retention '.$suffix,'username'=>'ret_'.$suffix,'password_hash'=>password_hash('SyntheticOnly123!',PASSWORD_DEFAULT),'role'=>'super_admin','is_active'=>1));$actor=(int)$db->insert_id();
+$db->insert('gh_booking_requests',array('fullname'=>'Retention '.$suffix,'phone'=>'087'.$suffix,'room_interest'=>'Synthetic','source'=>'retention fixture','status'=>'new'));$id=(int)$db->insert_id();
+$p=array('reason'=>'Synthetic archive reason','confirmed'=>'1');
+brcheck($m->ready(),'migration readiness');
+$paymentDir=APPPATH.'private_payment_proofs';if(!is_dir($paymentDir))mkdir($paymentDir,0700,TRUE);
+$ownProof='proof_'.substr(hash('sha256',$runtime['schema']),0,8).bin2hex(random_bytes(12)).'.pdf';
+$foreignProof='proof_'.substr(hash('sha256','gulhouse_test_foreign_'.$suffix),0,8).bin2hex(random_bytes(12)).'.pdf';
+file_put_contents($paymentDir.'/'.$ownProof,'%PDF-1.4 Synthetic own');file_put_contents($paymentDir.'/'.$foreignProof,'%PDF-1.4 Synthetic foreign prefix');
+$pathMethod=new ReflectionMethod($m,'file_path');$pathMethod->setAccessible(TRUE);
+brcheck((bool)$pathMethod->invoke($m,'payment',$ownProof),'payment proof current schema namespace accepted');
+brcheck($pathMethod->invoke($m,'payment',$foreignProof)===FALSE,'existing foreign namespace proof is protected');
+unlink($paymentDir.'/'.$ownProof);unlink($paymentDir.'/'.$foreignProof);
+$m->register_demo($id,'wasp-fixture','Synthetic isolated fixture deliberately registered for retention testing.');
+brcheck((bool)$m->registered($id),'trusted fresh exact ID registration');
+rejects(function()use($m,$id,$actor){$m->purge($id,$actor,array());},'purge without review rejected');
+$m->archive($id,$actor,$p);brcheck((bool)$ops->get_row('bookings',$id)['archived_at'],'archive stored');
+brcheck(!$ops->update_booking_status($id,'contacted'),'archived status writes rejected');
+brcheck(!in_array($id,array_column($ops->get_rows('bookings',array('q'=>$suffix)),'id')),'default list hides archive');
+brcheck(count($ops->get_rows('bookings',array('q'=>$suffix,'archive'=>'archived')))===1,'explicit archive filter');
+$m->archive($id,$actor,$p,TRUE);brcheck(!$ops->get_row('bookings',$id)['archived_at'],'restore keeps booking');
+$m->archive($id,$actor,$p);$plan=$m->preview($id,$actor);
+brcheck($plan['can_purge'],'fresh demo archived plan eligible');
+$payload=array('reason'=>'Synthetic purge transaction verification','confirmation'=>$plan['confirmation_phrase'],'plan_hash'=>$plan['plan_hash'],'review_token'=>$plan['review_token']);
+$db->where('id',$id)->update('gh_booking_requests',array('message'=>'changed fixture'));
+rejects(function()use($m,$id,$actor,$payload){$m->purge($id,$actor,$payload);},'stale row content invalidates plan');
+$plan=$m->preview($id,$actor);brcheck(!$plan['can_purge'],'immutable demo identity change blocks purge');
+$db->where('id',$id)->update('gh_booking_requests',array('message'=>NULL));
+$plan=$m->preview($id,$actor);$payload['plan_hash']=$plan['plan_hash'];$payload['review_token']=$plan['review_token'];
+$db->where('id',$actor)->update('gh_admin_users',array('role'=>'admin'));
+rejects(function()use($m,$id,$actor,$payload){$m->purge($id,$actor,$payload);},'current database downgrade blocks purge');
+$db->where('id',$actor)->update('gh_admin_users',array('role'=>'super_admin'));
+$m->purge($id,$actor,$payload);brcheck(!$ops->get_row('bookings',$id),'reviewed fresh demo purge commits');
+$audit=$db->where('booking_id',$id)->where('action','purge')->get('gh_booking_retention_audit')->row_array();
+brcheck($audit && $audit['backup_name'] && $audit['backup_sha256'],'retained purge audit links backup');
+$file=APPPATH.'private_booking_backups/'.substr(hash('sha256',$runtime['schema']),0,16).'/'.$audit['backup_name'];
+brcheck(is_file($file)&&hash_equals($audit['backup_sha256'],hash_file('sha256',$file)),'encrypted scoped backup persisted and verified');
+brcheck(substr(file_get_contents($file),0,5)==='GHBR1'&&strpos(file_get_contents($file),$suffix)===FALSE,'backup contains no plaintext identity');
+rejects(function()use($m,$id,$actor,$payload){$m->purge($id,$actor,$payload);},'double submit cannot purge twice');
+// Actual booking conversion creates exact owned roots and a full graph, not string-inferred links.
+$db->insert('gh_booking_requests',array('fullname'=>'Retention graph '.$suffix,'phone'=>'086'.$suffix,'room_interest'=>'Synthetic','source'=>'retention fixture','status'=>'new'));$full=(int)$db->insert_id();
+$m->register_demo($full,'wasp-fixture','Synthetic graph fixture deliberately registered before conversion.');
+$room=$db->where('status','available')->get('gh_rooms')->row_array();if(!$room)throw new RuntimeException('Synthetic available room required');
+brcheck($ops->convert_booking($full,array('room_id'=>$room['id'],'start_date'=>'2043-01-01','end_date'=>'2043-01-31','stay_status'=>'reserved')),'trusted demo actual conversion');
+$tenant=$db->where('source_booking_id',$full)->get('gh_tenants')->row_array();$stay=$db->where('source_booking_id',$full)->get('gh_tenant_stays')->row_array();$contract=$db->where('source_booking_id',$full)->get('gh_contracts')->row_array();
+brcheck($tenant&&$stay&&$contract,'all new root rows have exact source booking ID');
+$db->insert('gh_resident_cases',array('access_hash'=>hash('sha256',$suffix),'full_name'=>'Synthetic graph','phone'=>'086'.$suffix,'room_id'=>$room['id'],'tenant_id'=>$tenant['id'],'stay_id'=>$stay['id'],'status'=>'reserved'));$case=(int)$db->insert_id();
+$storage=APPPATH.'private_lifecycle/'.substr(hash('sha256',$runtime['schema']),0,16);if(!is_dir($storage))mkdir($storage,0700,TRUE);
+$name=bin2hex(random_bytes(24)).'.pdf';$content="%PDF-1.4\nSynthetic owned attachment $suffix";file_put_contents($storage.'/'.$name,$content);
+$db->insert('gh_resident_files',array('case_id'=>$case,'kind'=>'ktp','original_name'=>'synthetic.pdf','storage_name'=>$name,'mime'=>'application/pdf','sha256'=>hash('sha256',$content)));$fid=(int)$db->insert_id();
+$db->where('id',$case)->update('gh_resident_cases',array('ktp_file_id'=>$fid));
+$db->insert('gh_mobile_tokens',array('token_hash'=>hash('sha256','resident'.$suffix),'subject_kind'=>'resident','subject_id'=>$case,'expires_at'=>'2043-01-01 00:00:00'));
+$m->archive($full,$actor,$p);$plan=$m->preview($full,$actor);
+brcheck($plan['can_purge']&&($plan['counts']['gh_contract_documents']??0)>0&&($plan['counts']['gh_mobile_tokens']??0)===1,'full graph includes documents and resident token');
+$payload=array('reason'=>'Synthetic full graph purge verification','confirmation'=>$plan['confirmation_phrase'],'plan_hash'=>$plan['plan_hash'],'review_token'=>$plan['review_token']);
+// Deliberate SQL failure late in delete verifies real rollback of previously deleted descendants.
+$trigger='br_'.bin2hex(random_bytes(4));$db->query('CREATE TRIGGER `'.$trigger.'` BEFORE DELETE ON gh_tenants FOR EACH ROW BEGIN IF OLD.id='.(int)$tenant['id']." THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Synthetic rollback'; END IF; END");
+rejects(function()use($m,$full,$actor,$payload){$m->purge($full,$actor,$payload);},'late SQL trigger failure aborts complete transaction');
+$db->query('DROP TRIGGER `'.$trigger.'`');
+brcheck($db->where('id',$case)->count_all_results('gh_resident_cases')===1&&$db->where('id',$fid)->count_all_results('gh_resident_files')===1&&is_file($storage.'/'.$name),'rollback preserves descendants and physical attachment');
+$m->purge($full,$actor,$payload);
+brcheck(!$ops->get_row('bookings',$full)&&$db->where('id',$tenant['id'])->count_all_results('gh_tenants')===0&&$db->where('id',$case)->count_all_results('gh_resident_cases')===0,'full proven graph deletion commits');
+brcheck(is_file($storage.'/'.$name),'physical file retained until postcommit GC');
+$fullAudit=$db->where('booking_id',$full)->where('action','purge')->get('gh_booking_retention_audit')->row_array();$encrypted=file_get_contents(APPPATH.'private_booking_backups/'.substr(hash('sha256',$runtime['schema']),0,16).'/'.$fullAudit['backup_name']);
+$secretMethod=new ReflectionMethod($m,'strong_key');$secretMethod->setAccessible(TRUE);$backupKey=$secretMethod->invoke($m);
+$decoded=json_decode(openssl_decrypt(substr($encrypted,33),'aes-256-gcm',hash('sha256',$backupKey,TRUE),OPENSSL_RAW_DATA,substr($encrypted,5,12),substr($encrypted,17,16)),TRUE);
+brcheck($decoded && base64_decode($decoded['files'][0]['base64'])===$content && isset($decoded['rows']['gh_tenants'][$tenant['id']]),'backup decrypts with exact rows and original attachment bytes');unset($backupKey,$decoded);
+$gc=$m->collect_files($full);brcheck($gc['removed']===1&&!is_file($storage.'/'.$name),'postcommit GC deletes only owned hash-matched file');
+$db->where('booking_id',$full)->update('gh_booking_file_gc',array('status'=>'pending','finished_at'=>NULL));
+$gc=$m->collect_files($full);brcheck($gc['removed']===1&&$gc['pending']===0,'GC resumes idempotently after unlink-before-status interruption');
+$db->insert('gh_booking_file_gc',array('booking_id'=>$full,'storage_kind'=>'resident','storage_name'=>'../blocked.pdf','content_sha256'=>str_repeat('a',64)));$unsafeGc=(int)$db->insert_id();
+$gc=$m->collect_files($full);brcheck($gc['pending']===1&&$gc['removed']===0,'missing unsafe path remains blocked rather than marked removed');
+$db->where('id',$unsafeGc)->delete('gh_booking_file_gc');
+brcheck($db->where('id',$room['id'])->count_all_results('gh_rooms')===1,'room master never deleted');
+$db->where('id',$actor)->delete('gh_admin_users');
+echo json_encode(array('passed'=>$checks,'environment'=>'isolated_synthetic','real_rows_modified'=>0)).PHP_EOL;
+

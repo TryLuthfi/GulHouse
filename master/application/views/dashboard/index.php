@@ -3,8 +3,9 @@
     function gh_dash_money($value) {
         return 'Rp ' . number_format((int) $value, 0, ',', '.');
     }
-    $collectionRate = min(100, max(0, (int) $summary['collection_rate']));
+    $collectionRate = (int) $summary['collection_rate'];
     $occupancyRate = min(100, max(0, (int) $summary['occupancy_rate']));
+    $dashboardRole = $this->session->userdata('gh_admin_role');
 ?>
 <!doctype html>
 <html lang="id">
@@ -15,40 +16,35 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261001-partial-metric'); ?>">
-</head>
-<body>
-    <aside class="sidebar">
-        <a class="brand" href="<?= base_url('dashboard'); ?>"><span>GH</span><strong>GUL HOUSE</strong></a>
-        <nav>
-            <a class="is-active" href="<?= base_url('dashboard'); ?>">Dashboard</a>
-            <a href="<?= base_url('properties'); ?>">Properti</a>
-            <a href="<?= base_url('room-types'); ?>">Tipe Kamar</a>
-            <a href="<?= base_url('rooms'); ?>">Kamar</a>
-            <a href="<?= base_url('tenants'); ?>">Penghuni</a>
-            <a href="<?= base_url('payments'); ?>">Pembayaran</a>
-            <a href="<?= base_url('photos'); ?>">Foto</a>
-            <a href="#">Booking</a>
-        </nav>
-    </aside>
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261020-admin-ui-1'); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script></head>
+<body class="gh-admin-ui">
+    <?php $this->load->view('partials/sidebar', array('active_menu' => 'dashboard')); ?>
 
     <main class="main-shell dashboard-shell">
         <header class="topbar dashboard-topbar">
             <div class="dashboard-title"><p>Web Master</p><h1>Dashboard Operasional GulHouse</h1></div>
-            <label class="dashboard-search">
-                <span>Search</span>
-                <input type="search" placeholder="Cari kamar, pembayaran, penghuni" aria-label="Cari dashboard">
-            </label>
+            <?php if (! in_array($dashboardRole, array('finance','maintenance'), TRUE)): ?>
+            <form class="dashboard-search" method="get" action="<?= base_url('rooms'); ?>">
+                <label><span>Cari kamar</span><input name="q" type="search" placeholder="Nomor atau nama kamar" aria-label="Cari kamar"></label>
+                <button type="submit">Cari</button>
+            </form>
+            <?php endif; ?>
             <div class="dashboard-actions">
-                <button type="button" class="dashboard-icon-button">ID</button>
-                <button type="button" class="dashboard-icon-button">Mail</button>
-                <button type="button" class="dashboard-icon-button">Bell</button>
-                <div class="admin-chip"><span><?= html_escape($admin_name); ?></span><a href="<?= base_url('logout'); ?>">Logout</a></div>
+                <?php if ($dashboardRole !== 'finance'): ?><a class="dashboard-icon-button" href="<?= base_url('complaints'); ?>">Komplain</a><?php endif; ?>
+                <?php if (! in_array($dashboardRole, array('finance','maintenance'), TRUE)): ?><a class="dashboard-icon-button" href="<?= base_url('notifications'); ?>">Reminder</a><?php endif; ?>
+                <div class="admin-chip"><span><?= html_escape($admin_name); ?></span><?php $this->load->view('partials/logout'); ?></div>
             </div>
         </header>
 
         <section class="dashboard-filterbar">
+            <form class="dashboard-period-form" method="get" action="<?= base_url('dashboard'); ?>">
+                <label for="dashboard-period">Periode tagihan</label>
+                <input id="dashboard-period" type="month" name="period" value="<?= html_escape($selected_period); ?>" required>
+                <button type="submit">Tampilkan</button>
+            </form>
             <div><span>Periode aktif</span><strong><?= html_escape($summary['payment_period']); ?></strong></div>
+            <div><span>Periode data terbaru</span><strong><?= html_escape($summary['latest_data_period']); ?></strong></div>
             <div><span>Properti</span><strong><?= number_format((int) $summary['properties'], 0, ',', '.'); ?> gedung</strong></div>
             <div><span>Tipe kamar</span><strong><?= number_format((int) $summary['room_types'], 0, ',', '.'); ?> tipe</strong></div>
             <div><span>Import issue</span><strong><?= number_format((int) $summary['import_issues'], 0, ',', '.'); ?> data</strong></div>
@@ -56,16 +52,22 @@
 
         <section class="dashboard-kpi-grid">
             <article><span>Total kamar</span><strong><?= number_format((int) $summary['rooms'], 0, ',', '.'); ?></strong><p><?= (int) $summary['available']; ?> available, <?= (int) $summary['occupied']; ?> occupied</p></article>
-            <article><span>Occupancy</span><strong><?= $occupancyRate; ?>%</strong><div class="mini-progress"><i style="width: <?= $occupancyRate; ?>%"></i></div></article>
-            <article><span>Collection <?= html_escape($summary['payment_period']); ?></span><strong><?= $collectionRate; ?>%</strong><p><?= gh_dash_money($summary['latest_bill_paid']); ?> / <?= gh_dash_money($summary['latest_bill_total']); ?></p></article>
+            <article><span>Occupancy saat ini</span><strong><?= $occupancyRate; ?>%</strong><p>Occupied / kamar bertarif siap operasi; reservasi terpisah</p><div class="mini-progress"><i style="width: <?= $occupancyRate; ?>%"></i></div></article>
+            <article><span>Collection <?= html_escape($summary['payment_period']); ?></span><strong><?= $summary['latest_bill_total'] > 0 ? $collectionRate . '%' : 'n.a.'; ?></strong><p><?= gh_dash_money($summary['latest_bill_paid']); ?> / <?= gh_dash_money($summary['latest_bill_total']); ?></p></article>
             <article><span>Outstanding</span><strong><?= gh_dash_money($summary['outstanding_amount']); ?></strong><p><?= number_format((int) $summary['unpaid_bills'], 0, ',', '.'); ?> bill belum lunas</p></article>
             <article><span>Potensi bulanan</span><strong><?= gh_dash_money($summary['monthly_potential']); ?></strong><p>Data master kamar aktif</p></article>
-            <article><span>Total payment</span><strong><?= gh_dash_money($summary['payment_total_all']); ?></strong><p><?= number_format((int) $summary['payment_count'], 0, ',', '.'); ?> transaksi periode aktif</p></article>
+            <article><span>Pembayaran sewa periode</span><strong><?= gh_dash_money($summary['payment_revenue']); ?></strong><p><?= number_format((int) $summary['payment_count'], 0, ',', '.'); ?> transaksi; deposit terpisah</p></article>
+            <article><span>Kontrak expiring</span><strong><?= number_format((int) $summary['contracts_expiring'], 0, ',', '.'); ?></strong><p>Berakhir <= 30 hari</p></article>
+            <article><span>Maintenance open</span><strong><?= number_format((int) $summary['maintenance_open'], 0, ',', '.'); ?></strong><p>Open / assigned / progress</p></article>
+            <article><span>Komplain open</span><strong><?= number_format((int) $summary['complaints_open'], 0, ',', '.'); ?></strong><p>Open / progress</p></article>
+            <article><span>Fasilitas open</span><strong><?= number_format((int) $summary['facility_open'], 0, ',', '.'); ?></strong><p>Checklist perlu follow-up</p></article>
+            <article><span>Saldo deposit seluruh histori</span><strong><?= gh_dash_money($summary['deposit_balance']); ?></strong><p>Terpisah dari sewa<?= $summary['deposit_issues'] ? '; ' . (int) $summary['deposit_issues'] . ' saldo perlu rekonsiliasi' : ''; ?></p></article>
+            <article><span>Biaya operasional</span><strong><?= gh_dash_money($summary['operational_expenses']); ?></strong><p>Dibayar pada <?= html_escape($selected_period); ?></p></article>
         </section>
 
         <section class="dashboard-chart-grid">
             <article class="panel chart-panel wide">
-                <div class="panel-head"><div><p>Payment</p><h2>Tagihan, Terbayar, Outstanding Per Periode</h2></div><a class="mini-link" href="<?= base_url('payments'); ?>">Pembayaran</a></div>
+                <div class="panel-head"><div><p>Payment</p><h2>Perbandingan Tagihan, Terbayar, dan Sisa Per Periode</h2><span class="panel-hint">Tagihan = total bill kamar, Terbayar = payment masuk, Sisa = bill yang belum lunas.</span></div><a class="mini-link" href="<?= base_url('payments'); ?>">Pembayaran</a></div>
                 <canvas id="collectionByPeriodChart" height="120"></canvas>
             </article>
             <article class="panel chart-panel"><div class="panel-head"><div><p>Kamar</p><h2>Status Kamar</h2></div></div><canvas id="roomStatusChart" height="130"></canvas></article>
@@ -161,6 +163,6 @@
         window.GH_DASHBOARD_CHARTS = <?= json_encode($charts); ?>;
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="<?= base_url('assets/master/js/master.js?v=20261001-partial-metric'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
 </body>
 </html>

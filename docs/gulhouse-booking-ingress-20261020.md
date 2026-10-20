@@ -1,0 +1,17 @@
+# Pemeriksaan booking landing ke Master — 20 Oktober 2026
+
+Pemeriksaan baca-saja pada Apache lokal dan database operasional lokal menemukan tabel booking dan intake kosong. Landing dan Master memakai target database yang sama. Tidak ada penambahan, perubahan, atau penghapusan booking operasional oleh pemeriksaan ini.
+
+Audit merekam penghapusan booking19 pukul10:26:18 dan booking20 pukul10:26:33. Dua POST landing berikutnya tercatat pukul10:28:19 dan10:28:50, keduanya HTTP303. Redirect303 dipakai untuk berhasil maupun gagal, sehingga bukan bukti penyimpanan. Tidak ditemukan ERROR dalam log aplikasi landing tanggal20Oktober. Isi kiriman tidak dicatat; alasan penolakan kedua kiriman tersebut tidak dapat dipastikan secara retrospektif.
+
+Bug terpisah ditemukan pada deduplikasi lima menit: booking yang diarsipkan ikut dianggap duplikat, sehingga kiriman ulang dapat menerima pesan berhasil tanpa booking aktif baru. Perbaikan mengecualikan arsip dari deduplikasi; arsip lama tetap utuh dan duplikat aktif tetap dicegah. Bug ini tidak menjelaskan tabel yang saat ini kosong.
+
+Perbaikan tambahan memberi alasan validasi yang spesifik dan mempertahankan isian pada kegagalan. Modal dibuka kembali agar pengguna dapat memperbaiki isian. Tidak ada pencatatan isi formulir ke log dan tidak ada migrasi skema untuk perubahan ini.
+
+Berkas aplikasi yang berubah: `landing/application/models/Landing_model.php`, `landing/application/controllers/Home.php`, `landing/application/views/landing_home.php`, `landing/assets/landing/js/landing.js`, dan `landing/assets/landing/css/landing.css`. Cadangan dan manifest lima berkas berada di `.e2e/booking-ingress-20261020/`. WASP menangani model/controller, BUBU menangani tampilan/JS/CSS, dan CIKO menguji secara independen.
+
+Pengujian memakai database sintetis terpisah di loopback52873. Hasil akhir pemeriksaan independen dicatat di laporan CIKO. Perubahan lokal tidak berarti sudah diterapkan di gulhouse.co.id.
+
+CIKO melaporkan delapan pemeriksaan browser independen PASS: penolakan nomor invalid pada390/1280 dengan modal, lima isian, fokus dan tanpa insert; kiriman valid; duplikat aktif; kiriman ulang setelah arsip; pilihan kamar tidak dikenal; dan baris aktif di Master. Tidak ada page error. Fixture browser tidak menyediakan tipe penuh; kondisi penuh diuji pada model oleh WASP. Status QC PASS untuk cakupan ini, tanpa kesimpulan tentang alasan pasti kiriman lama. Sesudah browser ditutup, ZEYN memastikan lima hash sumber tetap sama, Apache lokal HTTP200 memuat versi aset baru, dan tabel operasional tetap kosong. Hanya server uji PHP milik run ini dihentikan; Apache tetap berjalan.
+
+Verifikasi WASP pada sumber akhir: `tests/verify-booking-ingress.php` **13/13 PASS**, termasuk POST ke action formulir hasil render dengan CSRF hingga record aktif terlihat melalui model Master; duplikat aktif new/contacted/survey tetap satu, sedangkan kiriman setelah arsip membuat record aktif terpisah tanpa mengubah arsip. `tests/verify-booking-validation.php` **18/18 PASS**, mencakup alasan per kolom, batas panjang, nomor tidak valid/format umum, tipe kamar tidak dikenal/penuh, bounded flash untuk lima isian, dan pembersihan error setelah berhasil. PHP lint model/controller PASS. Pengujian kesalahan database menggunakan fault injection untuk return FALSE/exception, bukan simulasi database mati atau jalur CI db_debug yang menghentikan proses. Cakupan tersebut tidak membuktikan alasan kiriman operasional pukul10:28.

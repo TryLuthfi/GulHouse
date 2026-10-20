@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20260912-payment'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20261019-landing-ui-r2'); ?>">
 </head>
 <body class="payment-page">
     <header class="payment-header">
@@ -21,7 +21,8 @@
         <nav aria-label="Navigasi payment">
             <a href="<?= base_url(); ?>">Landing</a>
             <a href="<?= base_url('#booking'); ?>">Booking</a>
-            <a href="https://wa.me/6280000000000" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="<?= base_url('resident/access'); ?>">Portal Penghuni</a>
+            <a href="<?= html_escape(gh_contact_url()); ?>" target="_blank" rel="noopener"><?= html_escape(gh_contact_label()); ?></a>
         </nav>
     </header>
 

@@ -43,3 +43,7 @@ $hook['post_controller_constructor'][] = array(
 	'filepath' => 'hooks',
 	'params'   => array()
 );
+
+// GulHouse request policy and CSRF fields for existing plain HTML forms.
+$hook['post_controller_constructor'][] = array('class' => 'Security_hook', 'function' => 'enforce', 'filename' => 'Security_hook.php', 'filepath' => 'hooks', 'params' => array());
+$hook['post_controller'][] = array('class' => 'Security_hook', 'function' => 'forms', 'filename' => 'Security_hook.php', 'filepath' => 'hooks', 'params' => array());

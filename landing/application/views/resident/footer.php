@@ -1,0 +1,1 @@
+</main><footer class="lc-footer">GUL HOUSE · Layanan penghuni dan riwayat masa tinggal</footer><script src="<?= base_url('assets/landing/js/lifecycle.js?v=20261020-all-revisions'); ?>" defer></script></body></html>

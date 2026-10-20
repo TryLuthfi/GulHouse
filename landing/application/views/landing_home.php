@@ -1,4 +1,20 @@
 <?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
+<?php
+    $bookingError = (string) $this->session->flashdata('booking_error');
+    $bookingErrorField = (string) $this->session->flashdata('booking_error_field');
+    $bookingOld = $this->session->flashdata('booking_old');
+    $bookingOld = is_array($bookingOld) ? $bookingOld : array();
+    $bookingValues = array();
+    foreach (array('fullname', 'phone', 'room_interest', 'move_in_plan', 'message') as $field) {
+        $bookingValues[$field] = isset($bookingOld[$field]) && is_scalar($bookingOld[$field]) ? (string) $bookingOld[$field] : '';
+    }
+    if (! in_array($bookingErrorField, array('fullname', 'phone', 'room_interest', 'move_in_plan', 'message'), TRUE)) {
+        $bookingErrorField = 'form';
+    }
+    $bookingErrorAttrs = function ($field) use ($bookingError, $bookingErrorField) {
+        return $bookingError !== '' && $bookingErrorField === $field ? ' aria-invalid="true" aria-describedby="booking-error-message"' : '';
+    };
+?>
 <!doctype html>
 <html lang="id">
 <head>
@@ -15,8 +31,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/landing/vendor/leaflet/leaflet.css?v=1.9.4'); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20260912-payment'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20261020-landing-tidy'); ?>">
 </head>
 <body>
     <header class="site-header" id="top">
@@ -35,11 +50,12 @@
             <a href="#facilities">Fasilitas</a>
             <a href="#costs">Biaya</a>
             <a href="#location">Lokasi</a>
-            <a href="#booking">Booking</a>
-            <a href="<?= base_url('payment'); ?>" data-payment-open>Payment</a>
+            <a href="#booking" data-booking-open>Booking</a>
+            <a href="<?= base_url('resident/portal'); ?>">Pembayaran</a>
+            <a href="<?= base_url('resident/access'); ?>">Penghuni</a>
             <a href="#contact">Kontak</a>
         </nav>
-        <a class="header-action" href="#booking">Cek Kamar</a>
+        <a class="header-action" href="#booking" data-booking-open>Survey Kamar</a>
     </header>
 
     <main>
@@ -54,8 +70,9 @@
                 <h1>GUL HOUSE</h1>
                 <p class="hero-lead">Hunian bulanan yang rapi, nyaman, dan mudah dikelola. Pilih kamar, jadwalkan survey, lalu masuk tanpa proses yang bertele-tele.</p>
                 <div class="hero-actions">
-                    <a class="btn btn-primary glow-button" href="#booking">Booking Survey</a>
-                    <a class="btn btn-ghost" href="https://wa.me/6280000000000" target="_blank" rel="noopener">WhatsApp</a>
+                    <a class="btn btn-primary glow-button" href="#booking" data-booking-open>Booking Survey</a>
+                    <a class="btn btn-ghost" href="<?= base_url('resident/start'); ?>">Daftar Penghuni</a>
+                    <a class="btn btn-ghost" href="<?= html_escape(gh_contact_url()); ?>" target="_blank" rel="noopener"><?= html_escape(gh_contact_label()); ?></a>
                 </div>
                 <div class="hero-badges" role="list" aria-label="Ringkasan layanan">
                     <span role="listitem">Survey terjadwal</span>
@@ -124,19 +141,65 @@
             </div>
         </section>
 
+        <?php
+            $roomsByProperty = array();
+            foreach ($all_rooms as $room) {
+                $propertyCode = isset($room['code']) && $room['code'] !== '' ? $room['code'] : 'GUL HOUSE';
+                if (! isset($roomsByProperty[$propertyCode])) {
+                    $roomsByProperty[$propertyCode] = array(
+                        'code' => $propertyCode,
+                        'city' => isset($room['city']) ? $room['city'] : '',
+                        'price_from' => 0,
+                        'total_rooms' => 0,
+                        'available_count' => 0,
+                        'types' => array(),
+                        'detail_slug' => isset($room['slug']) ? $room['slug'] : '',
+                    );
+                }
+
+                $price = (int) $room['price'];
+                if ($price > 0 && ((int) $roomsByProperty[$propertyCode]['price_from'] === 0 || $price < (int) $roomsByProperty[$propertyCode]['price_from'])) {
+                    $roomsByProperty[$propertyCode]['price_from'] = $price;
+                    $roomsByProperty[$propertyCode]['detail_slug'] = isset($room['slug']) ? $room['slug'] : $roomsByProperty[$propertyCode]['detail_slug'];
+                }
+
+                $roomsByProperty[$propertyCode]['total_rooms'] += (int) $room['total_rooms'];
+                $roomsByProperty[$propertyCode]['available_count'] += (int) $room['available_count'];
+                $roomsByProperty[$propertyCode]['types'][] = array(
+                    'name' => $room['type_name'],
+                    'available_count' => (int) $room['available_count'],
+                    'total_rooms' => (int) $room['total_rooms'],
+                    'price' => $price,
+                    'status' => $room['status'],
+                    'slug' => isset($room['slug']) ? $room['slug'] : '',
+                );
+            }
+            ksort($roomsByProperty);
+        ?>
         <section class="section split" id="rooms">
             <div class="section-copy reveal">
                 <p class="eyebrow">Ketersediaan</p>
                 <h2>Pilih gedung dan tipe kamar yang paling pas.</h2>
-                <p>Landing page menampilkan ringkasan per gedung dan jenis kamar. Nomor kamar disimpan untuk kebutuhan master agar calon penghuni cukup memilih tipe yang diinginkan.</p>
+                <p>Landing page menampilkan ringkasan per properti. Harga yang tampil adalah harga terendah dari tipe kamar yang tersedia di masing-masing properti.</p>
             </div>
-            <div class="type-grid">
-                <?php foreach ($room_types as $index => $type): ?>
-                    <article class="type-card reveal delay-<?= ($index % 4); ?>">
-                        <span><?= html_escape($type['name']); ?></span>
-                        <strong>Rp <?= number_format((int) $type['price_from'], 0, ',', '.'); ?></strong>
-                        <p><?= (int) $type['available_count']; ?> tersedia dari <?= (int) $type['total_rooms']; ?> kamar</p>
+            <div class="type-grid property-room-grid">
+                <?php $propertyIndex = 0; ?>
+                <?php foreach ($roomsByProperty as $property): ?>
+                    <article class="type-card property-room-card <?= (int) $property['available_count'] <= 0 ? 'is-unavailable' : ''; ?> reveal delay-<?= ($propertyIndex % 4); ?>">
+                        <span><?= html_escape($property['code']); ?></span>
+                        <small class="property-city"><?= html_escape(! empty($property['city']) ? $property['city'] : 'Lokasi belum diatur'); ?></small>
+                        <strong>Mulai Rp <?= number_format((int) $property['price_from'], 0, ',', '.'); ?></strong>
+                        <p><?= (int) $property['available_count']; ?> tersedia dari <?= (int) $property['total_rooms']; ?> kamar</p>
+                        <div class="property-type-list">
+                            <?php foreach ($property['types'] as $type): ?>
+                                <a class="<?= (int) $type['available_count'] <= 0 ? 'is-unavailable' : ''; ?>" href="<?= base_url('rooms/' . html_escape($type['slug'])); ?>">
+                                    <span><?= html_escape($type['name']); ?></span>
+                                    <em><?= (int) $type['available_count']; ?>/<?= (int) $type['total_rooms']; ?> tersedia</em>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
                     </article>
+                    <?php $propertyIndex++; ?>
                 <?php endforeach; ?>
             </div>
         </section>
@@ -159,8 +222,11 @@
                             <strong><?= html_escape($stat['property_name']); ?></strong>
                             <span><?= $availableRooms; ?> tersedia dari <?= $totalRooms; ?> kamar</span>
                         </div>
-                        <div class="insight-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= $availableRate; ?>" aria-label="<?= $availableRate; ?> persen tersedia">
-                            <span style="width: <?= $availableRate; ?>%;"></span>
+                        <div class="insight-progress <?= $availableRate <= 0 ? 'is-empty' : ''; ?>">
+                            <div class="insight-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= $availableRate; ?>" aria-label="<?= $availableRate; ?> persen tersedia">
+                                <span style="width: <?= $availableRate; ?>%;"></span>
+                            </div>
+                            <em><?= $availableRate; ?>%</em>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -169,81 +235,11 @@
 
         <?php
             $filterProperties = array();
-            $filterRoomTypes = array();
             foreach ($all_rooms as $room) {
                 $filterProperties[$room['code']] = $room['code'];
-                $filterRoomTypes[$room['type_name']] = $room['type_name'];
             }
             ksort($filterProperties);
-            ksort($filterRoomTypes);
         ?>
-        <section class="section room-browser reveal" id="availability">
-            <div class="browser-head">
-                <div>
-                    <p class="eyebrow">Jenis kamar</p>
-                    <h2>Cek gedung dan tipe sebelum tanya admin.</h2>
-                </div>
-                <div class="room-filter" data-room-filter>
-                    <div class="filter-group" data-filter-group="status">
-                        <span>Status</span>
-                        <div>
-                            <button type="button" class="is-active" data-filter-field="status" data-filter-value="all">Semua</button>
-                            <button type="button" data-filter-field="status" data-filter-value="available">Tersedia</button>
-                        </div>
-                    </div>
-                    <div class="filter-group" data-filter-group="property">
-                        <span>Jenis Gedung</span>
-                        <div>
-                            <button type="button" class="is-active" data-filter-field="property" data-filter-value="all">Semua</button>
-                            <?php foreach ($filterProperties as $propertyCode): ?>
-                                <button type="button" data-filter-field="property" data-filter-value="<?= html_escape($propertyCode); ?>"><?= html_escape($propertyCode); ?></button>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                    <div class="filter-group" data-filter-group="type">
-                        <span>Jenis Kamar</span>
-                        <div>
-                            <button type="button" class="is-active" data-filter-field="type" data-filter-value="all">Semua</button>
-                            <?php foreach ($filterRoomTypes as $typeName): ?>
-                                <button type="button" data-filter-field="type" data-filter-value="<?= html_escape($typeName); ?>"><?= html_escape($typeName); ?></button>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="room-list" data-room-list>
-                <?php foreach ($all_rooms as $index => $room): ?>
-                    <?php $statusLabel = $room['status'] === 'full' ? 'Full' : ucfirst($room['status']); ?>
-                    <article class="compact-room reveal delay-<?= ($index % 4); ?>" data-room-card data-status="<?= html_escape($room['status']); ?>" data-property="<?= html_escape($room['code']); ?>" data-type="<?= html_escape($room['type_name']); ?>">
-                        <div
-                            class="compact-photo photo-<?= ($index % 3) + 1; ?>"
-                            <?php if (! empty($room['cover_image'])): ?>
-                                style="background-image: url('<?= html_escape($room['cover_image']); ?>');"
-                            <?php endif; ?>></div>
-                        <div>
-                            <span><?= (int) $room['available_count']; ?> tersedia dari <?= (int) $room['total_rooms']; ?> kamar</span>
-                            <h3><?= html_escape($room['name']); ?></h3>
-                            <p>
-                                <?= html_escape($room['code']); ?> -
-                                Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?>
-                                <?php if ((int) $room['max_price'] > (int) $room['price']): ?>
-                                    - Rp <?= number_format((int) $room['max_price'], 0, ',', '.'); ?>
-                                <?php endif; ?>/bulan
-                            </p>
-                        </div>
-                        <div class="compact-actions">
-                            <span class="status-pill status-<?= html_escape($room['status']); ?>"><?= html_escape($statusLabel); ?></span>
-                            <a href="<?= base_url('rooms/' . html_escape($room['slug'])); ?>">Detail</a>
-                        </div>
-                    </article>
-                <?php endforeach; ?>
-                <div class="room-empty-state" data-room-empty aria-hidden="true">
-                    <strong>Belum ada tipe yang cocok</strong>
-                    <span>Coba pilih filter lain atau langsung booking survey agar admin bantu carikan opsi terdekat.</span>
-                </div>
-            </div>
-        </section>
-
         <section class="room-carousel-section reveal" aria-label="Kamar tersedia">
             <div class="carousel-heading">
                 <div>
@@ -255,27 +251,40 @@
                     <button type="button" class="carousel-btn" data-carousel-next aria-label="Kamar berikutnya">&rsaquo;</button>
                 </div>
             </div>
+                <div class="room-filter catalog-room-filter" data-room-filter>
+                    <div class="filter-group" data-filter-group="property">
+                        <span>Jenis Gedung</span>
+                        <div>
+                            <button type="button" class="is-active" data-filter-field="property" data-filter-value="all">Semua</button>
+                            <?php foreach ($filterProperties as $propertyCode): ?>
+                                <button type="button" data-filter-field="property" data-filter-value="<?= html_escape($propertyCode); ?>"><?= html_escape($propertyCode); ?></button>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
             <div class="room-carousel" data-carousel>
                 <?php foreach ($featured_rooms as $index => $room): ?>
-                    <article class="room-card" data-carousel-slide>
+                    <article class="room-card" data-carousel-slide data-room-card data-property="<?= html_escape($room['code']); ?>" data-type="<?= html_escape($room['type_name']); ?>" data-status="<?= (int) $room['available_count'] > 0 ? 'available' : 'unavailable'; ?>">
                         <div
-                            class="room-photo photo-<?= ($index % 3) + 1; ?>"
+                            class="room-photo<?= empty($room['cover_image']) ? ' room-photo-empty' : ''; ?>"
                             data-parallax-card
                             <?php if (! empty($room['cover_image'])): ?>
                                 style="background-image: url('<?= html_escape($room['cover_image']); ?>');"
-                            <?php endif; ?>></div>
+                            <?php endif; ?>><?php if (empty($room['cover_image'])): ?><span>Foto belum tersedia</span><?php endif; ?></div>
                         <div class="room-body">
                             <span><?= html_escape($room['code']); ?></span>
                             <h3><?= html_escape($room['name']); ?></h3>
+                            <p class="room-city"><?= html_escape(! empty($room['city']) ? $room['city'] : 'Lokasi belum diatur'); ?></p>
                             <p><?= (int) $room['available_count']; ?> kamar tersedia, mulai Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?>/bulan</p>
                             <div class="room-links">
                                 <a href="<?= base_url('rooms/' . html_escape($room['slug'])); ?>">Lihat detail</a>
-                                <a href="#booking">Booking survey</a>
+                                <?php if ((int) $room['available_count'] > 0): ?><a href="#booking" data-booking-open>Booking survey</a><?php endif; ?>
                             </div>
                         </div>
                     </article>
                 <?php endforeach; ?>
             </div>
+            <div class="room-empty-state" data-room-empty aria-hidden="true" role="status"><strong>Belum ada tipe yang cocok</strong><span>Pilih Semua pada filter untuk melihat pilihan lainnya.</span></div>
             <div class="carousel-dots" data-carousel-dots role="group" aria-label="Posisi carousel"></div>
         </section>
 
@@ -331,7 +340,12 @@
                 <?php endforeach; ?>
             </div>
             <div class="rules-panel reveal delay-1">
-                <h3>Aturan singkat</h3>
+                <div class="rules-panel__header">
+                    <h3>Aturan singkat</h3>
+                    <a class="rules-detail-link" href="<?= base_url('documents/house_rules'); ?>" target="_blank" rel="noopener">
+                        Lihat detail
+                    </a>
+                </div>
                 <ul>
                     <?php foreach ($house_rules as $rule): ?>
                         <li><?= html_escape($rule); ?></li>
@@ -365,6 +379,7 @@
                     'name' => 'Gulhouse 1',
                     'address' => 'Jl. H. Muchtar Raya No.96, RT.6/RW.8, Joglo, Kec. Kembangan, Kota Jakarta Barat, DKI Jakarta 11640',
                     'maps_url' => 'https://maps.app.goo.gl/XbAsDanWesr3FpMKA',
+                    'embed_url' => 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d247.89404462167548!2d106.73711087479933!3d-6.223493099999987!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69f184bb8dc073%3A0x4668b03a9462681a!2sArba%20Properti!5e0!3m2!1sid!2sid!4v1788919540224!5m2!1sid!2sid',
                     'lat' => -6.22342,
                     'lng' => 106.73698,
                 ),
@@ -373,6 +388,7 @@
                     'name' => 'Gulhouse 2',
                     'address' => 'Jl. H. Muchtar Raya No.2a, RT.9/RW.8, Joglo, Kec. Kembangan, Kota Jakarta Barat, DKI Jakarta 11640',
                     'maps_url' => 'https://maps.app.goo.gl/9XBSHXUQEM547QXp9',
+                    'embed_url' => 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d247.89404462167548!2d106.73711087479933!3d-6.223493099999987!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e69f10054586a53%3A0x3f3f54e2c1865ddb!2sGulhouse%20-%202!5e0!3m2!1sid!2sid!4v1788919573399!5m2!1sid!2sid',
                     'lat' => -6.22357,
                     'lng' => 106.73724,
                 ),
@@ -382,12 +398,16 @@
             <div class="location-copy reveal delay-1">
                 <p class="eyebrow">Lokasi</p>
                 <h2>Dibuat mudah untuk aktivitas harian.</h2>
-                <p>GH 1 dan GH 2 berada di area yang sama di Joglo, Kembangan. Dua marker ditampilkan dalam satu peta agar calon penghuni langsung paham posisi masing-masing gedung.</p>
+                <p>GH 1 dan GH 2 berada di area yang sama di Joglo, Kembangan. Pilih gedung untuk melihat peta dan alamat masing-masing lokasi.</p>
                 <div class="map-tabs" role="tablist" aria-label="Pilih lokasi Gulhouse">
                     <?php foreach ($propertyMaps as $index => $map): ?>
                         <button
                             type="button"
                             class="<?= $index === 0 ? 'is-active' : ''; ?>"
+                            id="map-tab-<?= $index; ?>"
+                            role="tab"
+                            aria-controls="map-view-<?= $index; ?>"
+                            tabindex="<?= $index === 0 ? '0' : '-1'; ?>"
                             data-map-tab="<?= html_escape($map['code']); ?>"
                             aria-selected="<?= $index === 0 ? 'true' : 'false'; ?>">
                             <span><?= html_escape($map['code']); ?></span>
@@ -405,12 +425,19 @@
                 </div>
             </div>
             <div class="location-map-shell reveal" data-map-switcher>
-                <div class="location-map" data-map-canvas>
-                    <div class="map-fallback" aria-hidden="true">
-                        <span>GH1</span>
-                        <span>GH2</span>
-                    </div>
+                <div class="location-map">
+                    <?php foreach ($propertyMaps as $index => $map): ?>
+                        <div id="map-view-<?= $index; ?>" role="tabpanel" aria-labelledby="map-tab-<?= $index; ?>" data-map-view="<?= html_escape($map['code']); ?>"<?= $index === 0 ? '' : ' hidden'; ?>>
+                            <iframe
+                                title="Peta lokasi <?= html_escape($map['name']); ?>"
+                                <?= $index === 0 ? 'src' : 'data-map-src'; ?>="<?= html_escape($map['embed_url']); ?>"
+                                loading="lazy"
+                                referrerpolicy="strict-origin-when-cross-origin"
+                                allowfullscreen></iframe>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
+                <p class="map-help">Jika peta tidak tampil karena koneksi atau pengaturan browser, gunakan tautan Google Maps pada alamat di bawah.</p>
                 <div class="map-card-list">
                 <?php foreach ($propertyMaps as $index => $map): ?>
                     <article
@@ -504,30 +531,56 @@
                     <div class="alert warning"><?= html_escape($this->session->flashdata('warning')); ?></div>
                 <?php endif; ?>
             </div>
-            <form class="booking-form reveal delay-1" method="post" action="<?= base_url('booking'); ?>">
-                <label>Nama Lengkap
-                    <input type="text" name="fullname" required placeholder="Nama calon penghuni">
-                </label>
-                <label>No. WhatsApp
-                    <input type="tel" name="phone" required placeholder="08xxxxxxxxxx">
-                </label>
-                <label>Minat Kamar
-                    <select name="room_interest">
-                        <option value="">Pilih kamar/tipe</option>
-                        <?php foreach ($featured_rooms as $room): ?>
-                            <option value="<?= html_escape($room['name']); ?>"><?= html_escape($room['name']); ?> - mulai Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-                <label>Rencana Masuk
-                    <input type="text" name="move_in_plan" placeholder="Contoh: akhir bulan ini">
-                </label>
-                <label class="full">Catatan
-                    <textarea name="message" rows="4" placeholder="Tanyakan fasilitas, deposit, atau jadwal survey"></textarea>
-                </label>
-                <button type="submit" class="glow-button">Kirim Booking</button>
-            </form>
+            <div class="booking-modal-trigger reveal delay-1">
+                <div class="booking-modal-trigger-copy">
+                    <span>LANGKAH SELANJUTNYA</span>
+                    <strong>Temukan kamar yang cocok.</strong>
+                </div>
+                <button type="button" class="booking-modal-trigger-button" data-booking-open>
+                    Booking survey <span aria-hidden="true">&rarr;</span>
+                </button>
+            </div>
         </section>
+
+        <div class="booking-modal" data-booking-modal aria-hidden="true"<?= $bookingError !== '' ? ' data-booking-error="' . html_escape($bookingErrorField) . '"' : ''; ?>>
+            <div class="booking-modal-backdrop" data-booking-close></div>
+            <section class="booking-modal-card" role="dialog" aria-modal="true" aria-labelledby="booking-modal-title">
+                <button type="button" class="booking-modal-close" data-booking-close aria-label="Tutup modal booking">&times;</button>
+                <p class="eyebrow">Booking</p>
+                <h2 id="booking-modal-title">Jadwalkan survey kamar.</h2>
+                <p>Isi data singkat. Tim GUL HOUSE akan follow up dari dashboard master.</p>
+                <?php if ($bookingError !== ''): ?>
+                    <div class="alert warning booking-error" id="booking-error-message" role="alert" tabindex="-1"><strong>Booking belum terkirim.</strong> <?= html_escape($bookingError); ?></div>
+                <?php endif; ?>
+                <form class="booking-form" method="post" action="<?= base_url('booking'); ?>">
+                    <label>Nama Lengkap
+                        <input type="text" name="fullname" required maxlength="150" placeholder="Nama calon penghuni" value="<?= html_escape($bookingValues['fullname']); ?>"<?= $bookingErrorAttrs('fullname'); ?>>
+                    </label>
+                    <label>No. WhatsApp
+                        <input type="tel" name="phone" required inputmode="numeric" pattern="[0-9]{9,15}" minlength="9" maxlength="15" placeholder="08xxxxxxxxxx" value="<?= html_escape($bookingValues['phone']); ?>" data-booking-phone<?= $bookingErrorAttrs('phone'); ?>>
+                    </label>
+                    <label>Minat Kamar
+                        <select name="room_interest" required<?= $bookingErrorAttrs('room_interest'); ?>>
+                            <option value="">Pilih kamar/tipe</option>
+                            <?php $bookingInterestFound = FALSE; ?>
+                            <?php foreach ($featured_rooms as $room): ?>
+                                <?php if ((int) $room['available_count'] <= 0) { continue; } ?>
+                                <?php $isPreviousInterest = $bookingValues['room_interest'] === (string) $room['name']; if ($isPreviousInterest) { $bookingInterestFound = TRUE; } ?>
+                                <option value="<?= html_escape($room['name']); ?>" <?= $isPreviousInterest ? 'selected' : ''; ?>><?= html_escape($room['name']); ?> - mulai Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php if ($bookingValues['room_interest'] !== '' && ! $bookingInterestFound): ?><small class="booking-field-help">Pilihan sebelumnya, <?= html_escape($bookingValues['room_interest']); ?>, tidak tersedia. Silakan pilih kamar lain.</small><?php endif; ?>
+                    </label>
+                    <label>Estimasi mulai tinggal
+                        <input type="date" name="move_in_plan" min="<?= (new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta')))->format('Y-m-d'); ?>" value="<?= html_escape($bookingValues['move_in_plan']); ?>" data-booking-date<?= $bookingErrorAttrs('move_in_plan'); ?>>
+                    </label>
+                    <label class="full">Catatan
+                        <textarea name="message" rows="4" maxlength="2000" placeholder="Tanyakan fasilitas, deposit, atau jadwal survey"<?= $bookingErrorAttrs('message'); ?>><?= html_escape($bookingValues['message']); ?></textarea>
+                    </label>
+                    <button type="submit" class="glow-button">Kirim Booking</button>
+                </form>
+            </section>
+        </div>
 
         <section class="section contact" id="contact">
             <div class="reveal">
@@ -546,34 +599,23 @@
     </main>
 
     <footer class="site-footer">
-        <span>GUL HOUSE</span>
-        <a href="#top">Kembali ke atas</a>
+        <span class="footer-brand">GUL HOUSE</span>
+        <nav class="footer-contacts" aria-label="Kontak GUL HOUSE">
+            <span>Hubungi kami</span>
+            <?php if (gh_contact_number()): ?>
+                <a href="<?= html_escape(gh_contact_url()); ?>" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp GUL HOUSE">WhatsApp <span>+<?= html_escape(gh_contact_number()); ?></span></a>
+            <?php endif; ?>
+            <?php if (gh_instagram_username()): ?>
+                <a href="<?= html_escape(gh_instagram_url()); ?>" target="_blank" rel="noopener noreferrer" aria-label="Instagram GUL HOUSE">Instagram <span>@<?= html_escape(gh_instagram_username()); ?></span></a>
+            <?php endif; ?>
+        </nav>
+        <a class="footer-top" href="#top" data-scroll-top>Kembali ke atas</a>
     </footer>
     <div class="sticky-cta">
-        <a href="https://wa.me/6280000000000" target="_blank" rel="noopener">WhatsApp</a>
-        <a href="#booking">Booking</a>
-        <a href="<?= base_url('payment'); ?>" data-payment-open>Payment</a>
+        <a href="<?= html_escape(gh_contact_url()); ?>" target="_blank" rel="noopener"><?= html_escape(gh_contact_label()); ?></a>
+        <a href="#booking" data-booking-open>Booking</a>
+        <a href="<?= base_url('resident/portal'); ?>">Pembayaran</a>
     </div>
-    <div class="payment-modal" data-payment-modal aria-hidden="true">
-        <div class="payment-modal-backdrop" data-payment-close></div>
-        <section class="payment-modal-card" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
-            <button type="button" class="payment-modal-close" data-payment-close aria-label="Tutup modal payment">&times;</button>
-            <p class="eyebrow">Payment</p>
-            <h2 id="payment-modal-title">Cek tagihan penghuni.</h2>
-            <p>Masukkan nomor HP yang terdaftar dan 4 digit akhir NIK. Setelah cocok, halaman status pembayaran akan terbuka.</p>
-            <form class="payment-check-form" method="post" action="<?= base_url('payment/check'); ?>">
-                <label>No. HP Penghuni
-                    <input type="tel" name="phone" required inputmode="tel" autocomplete="tel" placeholder="08xxxxxxxxxx">
-                </label>
-                <label>4 Digit Akhir NIK
-                    <input type="password" name="nik_last4" required inputmode="numeric" maxlength="4" pattern="[0-9]{4}" autocomplete="off" placeholder="1234">
-                </label>
-                <button type="submit" class="glow-button">Cek Pembayaran</button>
-            </form>
-            <a class="payment-modal-link" href="<?= base_url('payment'); ?>">Buka halaman payment</a>
-        </section>
-    </div>
-    <script defer src="<?= base_url('assets/landing/vendor/leaflet/leaflet.js?v=1.9.4'); ?>"></script>
-    <script defer src="<?= base_url('assets/landing/js/landing.js?v=20260912-payment'); ?>"></script>
+    <script defer src="<?= base_url('assets/landing/js/landing.js?v=20261020-portal-access'); ?>"></script>
 </body>
 </html>

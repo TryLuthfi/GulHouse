@@ -147,7 +147,8 @@ $config['subclass_prefix'] = 'MY_';
 | Note: This will NOT disable or override the CodeIgniter-specific
 |	autoloading (application/config/autoload.php)
 */
-$config['composer_autoload'] = APPPATH . '../vendor/autoload.php';
+$composerAutoloadPath = APPPATH . '../vendor/autoload.php';
+$config['composer_autoload'] = is_file($composerAutoloadPath) ? $composerAutoloadPath : FALSE;
 
 /*
 |--------------------------------------------------------------------------
@@ -335,7 +336,15 @@ $config['cache_query_string'] = FALSE;
 | https://codeigniter.com/user_guide/libraries/encryption.html
 |
 */
-$config['encryption_key'] = 'gulhouse_landing_change_this_key_on_production';
+$runtimeEnv = array();
+foreach (array(FCPATH . '.env', dirname(FCPATH) . '/.env', dirname(FCPATH) . '/landing/.env') as $runtimeEnvPath) {
+    if (is_file($runtimeEnvPath)) { $runtimeEnv = parse_ini_file($runtimeEnvPath); break; }
+}
+$runtimeEncryptionKey = getenv('GULHOUSE_ENCRYPTION_KEY');
+if ($runtimeEncryptionKey === FALSE || $runtimeEncryptionKey === '') {
+    $runtimeEncryptionKey = isset($runtimeEnv['GULHOUSE_ENCRYPTION_KEY']) ? $runtimeEnv['GULHOUSE_ENCRYPTION_KEY'] : '';
+}
+$config['encryption_key'] = $runtimeEncryptionKey !== '' ? $runtimeEncryptionKey : 'gulhouse_landing_change_this_key_on_production';
 
 /*
 |--------------------------------------------------------------------------
@@ -392,6 +401,12 @@ $config['sess_driver'] = 'files';
 $config['sess_cookie_name'] = 'gh_master_session';
 $config['sess_expiration'] = 7200;
 $sessionPath = APPPATH . 'cache/sessions';
+$testSessionDatabase = getenv('GULHOUSE_DATABASE');
+if (is_string($testSessionDatabase) && preg_match('/^gulhouse_test_[A-Za-z0-9_]+$/D', $testSessionDatabase)) {
+    $sessionPath .= '/tests/' . $testSessionDatabase;
+    $testPort = isset($_SERVER['SERVER_PORT']) ? (string)$_SERVER['SERVER_PORT'] : 'cli';
+    if (ctype_digit($testPort)) $sessionPath .= '_p' . $testPort;
+}
 if (!is_dir($sessionPath)) {
     @mkdir($sessionPath, 0755, true);
 }
@@ -405,6 +420,14 @@ $config['sess_save_path'] = $sessionPath;
 $config['sess_match_ip'] = FALSE;
 $config['sess_time_to_update'] = 300;
 $config['sess_regenerate_destroy'] = FALSE;
+$masterCookiePath = '/master/';
+if (!empty($_SERVER['SCRIPT_NAME'])) {
+    $scriptName = str_replace('\\', '/', (string) $_SERVER['SCRIPT_NAME']);
+    $scriptDir = rtrim(dirname($scriptName), '/');
+    if ($scriptDir !== '' && $scriptDir !== '.') {
+        $masterCookiePath = $scriptDir . '/';
+    }
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -423,8 +446,8 @@ $config['sess_regenerate_destroy'] = FALSE;
 */
 $config['cookie_prefix']    = 'gh_master_';
 $config['cookie_domain']    = '';
-$config['cookie_path']        = '/master/';
-$config['cookie_secure']    = FALSE;
+$config['cookie_path']        = $masterCookiePath;
+$config['cookie_secure'] = isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) === 'on';
 $config['cookie_httponly']     = TRUE;
 
 /*
@@ -469,12 +492,13 @@ $config['global_xss_filtering'] = FALSE;
 | 'csrf_regenerate' = Regenerate token on every submission
 | 'csrf_exclude_uris' = Array of URIs which ignore CSRF checks
 */
-$config['csrf_protection'] = FALSE;
-$config['csrf_token_name'] = 'csrf_test_name';
-$config['csrf_cookie_name'] = 'csrf_cookie_name';
+$config['csrf_protection'] = TRUE;
+$config['csrf_token_name'] = 'csrf_gh_master';
+$config['csrf_cookie_name'] = 'csrf_cookie_master';
 $config['csrf_expire'] = 7200;
-$config['csrf_regenerate'] = TRUE;
+$config['csrf_regenerate'] = FALSE;
 $config['csrf_exclude_uris'] = array();
+$config['csrf_exclude_uris'][] = 'api/mobile(?:/.*)?';
 
 /*
 |--------------------------------------------------------------------------

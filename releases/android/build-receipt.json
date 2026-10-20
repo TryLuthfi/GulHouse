@@ -1,0 +1,10 @@
+{
+  "built_at": "2026-10-19T18:51:37.2682356+07:00",
+  "signing_certificate_sha256": "ee80504f0c58e785b210f41fcfe2d237de7dcfb3db50c2ea3eeb810cc59ed11c",
+  "signature_verified": true,
+  "source_sha256": "fc8d3c4f08270662e770c2cecb9b3f38da1775d69a8194033a52fd3215b863bd",
+  "architectures": "arm64-v8a,armeabi-v7a",
+  "api": "https://gulhouse.co.id/master/index.php/api/mobile",
+  "file": "GulHouse-1.0.0.apk",
+  "sha256": "4c3668cfcc96effe83dc4b37e291c29c71c4849a522155b6ba8631c77f57318e"
+}

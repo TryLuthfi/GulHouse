@@ -1,0 +1,6 @@
+Options -Indexes
+RewriteEngine On
+RewriteRule ^(?:database|tests|scripts|docs|mobile|node_modules|\.git|\.deploy|\.e2e|\.tools)(?:/|$) - [F,L,NC]
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

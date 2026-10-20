@@ -1,0 +1,7 @@
+# Do not expose resident sessions or application files as static downloads.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Deny from all
+</IfModule>

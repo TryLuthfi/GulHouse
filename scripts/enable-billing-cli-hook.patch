@@ -1,0 +1,12 @@
+--- a/master/application/hooks/Security_hook.php
++++ b/master/application/hooks/Security_hook.php
+@@ -10,6 +10,9 @@ class Security_hook
+         $ci =& get_instance();
+         $controller = strtolower($ci->router->fetch_class());
+         $method = strtolower($ci->router->fetch_method());
++        if ($controller === 'jobs' && $method === 'billing' && $ci->input->is_cli_request()) {
++            return; // Jobs independently enforces target schema and explicit real-schema opt-in.
++        }
+         if ($controller === 'auth' && $method === 'login') {
+             return;
+         }

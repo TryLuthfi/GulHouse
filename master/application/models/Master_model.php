@@ -3,6 +3,34 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Master_model extends CI_Model
 {
+    private $payment_error = '';
+    public function get_payment_error(){return $this->payment_error;}
+    public function get_payment_quotes(array $billIds)
+    {
+        $billIds=array_values(array_unique(array_filter(array_map('intval',$billIds))));
+        if(!$billIds)return array();
+        $bills=$this->db->where_in('id',$billIds)->get('gh_room_bills')->result_array();$stayIds=array();
+        foreach($bills as $b)if(!empty($b['stay_id']))$stayIds[]=(int)$b['stay_id'];
+        $stays=array();$ledgers=array();$deposits=array();$rent=array();
+        foreach($this->db->where_in('room_bill_id',$billIds)->where('payment_type','rent')->get('gh_payments')->result_array() as $p)$rent[$p['room_bill_id']]=($rent[$p['room_bill_id']]??0)+(int)$p['amount'];
+        if($stayIds){
+            foreach($this->db->where_in('id',$stayIds)->get('gh_tenant_stays')->result_array() as $s)$stays[$s['id']]=$s;
+            foreach($this->db->where_in('stay_id',$stayIds)->get('gh_deposit_transactions')->result_array() as $l)$ledgers[$l['stay_id']][]=$l;
+            foreach($this->db->select('pay.*,b.stay_id')->from('gh_payments pay')->join('gh_room_bills b','b.id=pay.room_bill_id')->where_in('b.stay_id',$stayIds)->where('pay.payment_type','deposit')->get()->result_array() as $p)$deposits[$p['stay_id']][]=$p;
+        }
+        $out=array();foreach($bills as $b)$out[$b['id']]=$this->settlement_quote($b,$stays[$b['stay_id']]??NULL,$rent[$b['id']]??0,$ledgers[$b['stay_id']]??array(),$deposits[$b['stay_id']]??array());return $out;
+    }
+    private function settlement_quote($bill,$stay,$rentPaid,array $ledgers,array $deposits)
+    {
+        $balance=0;$linked=array();$valid=TRUE;
+        foreach($ledgers as $l){$balance+=in_array($l['transaction_type'],array('received','adjustment'),TRUE)?(int)$l['amount']:-(int)$l['amount'];if(!empty($l['source_payment_id']))$linked[(int)$l['source_payment_id']]=TRUE;if((int)$l['tenant_id']!==(int)($stay['tenant_id']??0))$valid=FALSE;}
+        // Imported deposit payments without a ledger row still count as already received.
+        foreach($deposits as $p)if(!isset($linked[(int)$p['id']]))$balance+=(int)$p['amount'];
+        $rentAllowed=isset($bill['base_price'])&&is_numeric($bill['base_price'])&&(int)$bill['base_price']>=0&&!in_array($bill['bill_status'],array('empty','reserved','internal'),TRUE);
+        $depositAllowed=$stay&&isset($stay['deposit'])&&is_numeric($stay['deposit'])&&(int)$stay['deposit']>=0&&$valid&&(int)$stay['tenant_id']===(int)$bill['tenant_id']&&(int)$stay['room_id']===(int)$bill['room_id']&&in_array($stay['stay_status'],array('reserved','active'),TRUE);
+        $rent=max(0,(int)$bill['base_price']-(int)$rentPaid);$deposit=$depositAllowed?max(0,(int)$stay['deposit']-$balance):0;
+        return array('rent_remaining'=>$rentAllowed?$rent:0,'deposit_remaining'=>$deposit,'rent_available'=>$rentAllowed,'deposit_available'=>(bool)$depositAllowed,'rent_reason'=>$rentAllowed?($rent>0?'':'Sewa sudah lunas.'):'Tagihan ini tidak menerima pembayaran sewa.','deposit_reason'=>$depositAllowed?($deposit>0?'':'Deposit masa tinggal sudah terpenuhi.'):'Deposit belum dapat dibayar: masa tinggal aktif/reservasi dan identitas tagihan harus terhubung secara pasti.','can_pay_rent'=>$rentAllowed&&$rent>0,'can_pay_deposit'=>$depositAllowed&&$deposit>0,'deposit_balance'=>$balance,'deposit_required'=>(int)($stay['deposit']??0),'method'=>'Transfer');
+    }
     public function get_properties(array $filters = array())
     {
         $this->db->from('gh_properties');
@@ -149,7 +177,7 @@ class Master_model extends CI_Model
 
     public function save_room(array $payload)
     {
-        if ($payload['property_id'] <= 0 || $payload['room_type_id'] <= 0 || $payload['room_code'] === '') {
+        if ($payload['property_id'] <= 0 || $payload['room_type_id'] <= 0 || $payload['room_code'] === '' || ($payload['deposit'] !== null && $payload['deposit'] < 0) || ($payload['monthly_price'] !== null && $payload['monthly_price'] < 0)) {
             return FALSE;
         }
 
@@ -258,7 +286,7 @@ class Master_model extends CI_Model
 
     public function save_tenant_stay(array $payload)
     {
-        if ($payload['room_id'] <= 0) {
+        if ($payload['room_id'] <= 0 || ! $this->valid_flow_date($payload['check_in_date']) || (! empty($payload['check_out_date']) && (! $this->valid_flow_date($payload['check_out_date']) || $payload['check_out_date'] < $payload['check_in_date'])) || ($payload['monthly_price'] !== null && $payload['monthly_price'] < 0) || ($payload['deposit'] !== null && $payload['deposit'] < 0)) {
             return FALSE;
         }
 
@@ -266,8 +294,31 @@ class Master_model extends CI_Model
         if (in_array($stayStatus, array('active', 'reserved'), TRUE) && $payload['fullname'] === '') {
             return FALSE;
         }
+        if ($payload['identity_number'] !== '' && $this->db->where('identity_number', $payload['identity_number'])->where('id !=', (int) $payload['tenant_id'])->count_all_results('gh_tenants') > 0) return FALSE;
+        if ($payload['stay_id'] > 0) {
+            $existingStay = $this->db->where('id', $payload['stay_id'])->get('gh_tenant_stays')->row_array();
+            if (! $existingStay || (int) $existingStay['tenant_id'] !== (int) $payload['tenant_id']) return FALSE;
+            if ($this->db->table_exists('gh_resident_cases') && $this->db->where('stay_id',(int)$payload['stay_id'])->count_all_results('gh_resident_cases')) {
+                // Linked physical/financial history belongs to this exact stay and tenant.
+                foreach (array('room_id','stay_status','check_in_date','check_out_date','monthly_price','deposit') as $fixed) if ((string)$payload[$fixed] !== (string)$existingStay[$fixed]) return FALSE;
+            }
+        }
 
         $this->db->trans_start();
+
+        $room = $this->db->query('SELECT * FROM gh_rooms WHERE id = ? FOR UPDATE', array($payload['room_id']))->row_array();
+        $this->load->model('Operations_model');
+        if (! $room || (in_array($stayStatus, array('active', 'reserved', 'internal'), TRUE) && $this->Operations_model->room_overlap($payload['room_id'], $payload['check_in_date'], $payload['check_out_date'] ?: '9999-12-31', $payload['stay_id']))) {
+            $this->db->trans_complete();
+            return FALSE;
+        }
+        if ($payload['stay_id'] > 0 && $this->db->where('stay_id', $payload['stay_id'])->where_in('status', array('active','expiring'))->count_all_results('gh_contracts') > 0) {
+            $existingStay = $this->db->where('id', $payload['stay_id'])->get('gh_tenant_stays')->row_array();
+            foreach (array('room_id', 'stay_status', 'check_in_date', 'check_out_date', 'monthly_price', 'deposit') as $fixed) {
+                if ((string) $payload[$fixed] !== (string) $existingStay[$fixed]) { $this->db->trans_complete(); return FALSE; }
+            }
+        }
+        if ($payload['stay_id'] <= 0 && $stayStatus === 'active') $stayStatus = 'reserved';
 
         $tenantId = null;
         if ($payload['fullname'] !== '') {
@@ -319,6 +370,10 @@ class Master_model extends CI_Model
             $this->db->where('id', $payload['stay_id'])->update('gh_tenant_stays', $stayData);
         } else {
             $this->db->insert('gh_tenant_stays', $stayData);
+            $newStayId = (int) $this->db->insert_id();
+            if ($tenantId && in_array($stayStatus, array('active', 'reserved'), TRUE) && $payload['check_out_date'] && $payload['monthly_price'] > 0) {
+                $this->Operations_model->create_draft_for_stay($newStayId);
+            }
         }
 
         $this->sync_room_from_stay($payload['room_id'], $stayStatus);
@@ -329,10 +384,12 @@ class Master_model extends CI_Model
 
     public function end_tenant_stay($id)
     {
+        if ($this->db->table_exists('gh_resident_cases') && $this->db->where('stay_id',(int)$id)->count_all_results('gh_resident_cases')) return FALSE;
         $stay = $this->db->where('id', $id)->get('gh_tenant_stays')->row_array();
         if ( ! $stay) {
             return FALSE;
         }
+        if ($this->db->table_exists('gh_contracts') && $this->db->where('stay_id', $id)->where_in('status', array('active', 'expiring', 'draft'))->count_all_results('gh_contracts') > 0) return FALSE;
 
         $this->db->trans_start();
         $this->db->where('id', $id)->update('gh_tenant_stays', array(
@@ -402,7 +459,7 @@ class Master_model extends CI_Model
         $this->db
             ->select('COUNT(DISTINCT rb.id) AS bills', FALSE)
             ->select('COALESCE(SUM(rb.paid_total), 0) AS paid_total', FALSE)
-            ->select('COALESCE(SUM(rb.past_due_amount), 0) AS past_due_total', FALSE)
+            ->select('COALESCE(SUM(CASE WHEN rb.bill_status IN ("unpaid","partial") AND rb.due_date < CURDATE() THEN GREATEST(CAST(rb.base_price AS DECIMAL(20,0))-CAST(rb.paid_total AS DECIMAL(20,0)),0) ELSE 0 END), 0) AS past_due_total', FALSE)
             ->select('SUM(CASE WHEN rb.bill_status = "empty" THEN 1 ELSE 0 END) AS empty_rooms', FALSE)
             ->from('gh_room_bills rb')
             ->join('gh_billing_periods bp', 'bp.id = rb.period_id')
@@ -449,71 +506,97 @@ class Master_model extends CI_Model
             ->result_array();
     }
 
+    public function get_payment_bill_options()
+    {
+        return $this->db->select('rb.id, rb.tenant_name_snapshot, rb.bill_status, bp.period_label, r.room_label, p.code AS property_code')->from('gh_room_bills rb')
+            ->join('gh_billing_periods bp', 'bp.id=rb.period_id')->join('gh_rooms r', 'r.id=rb.room_id')->join('gh_properties p', 'p.id=r.property_id', 'left')
+            ->where_in('rb.bill_status', array('unpaid','partial','paid','overpaid','unknown'))->order_by('bp.period_key', 'DESC')->order_by('r.room_label', 'ASC')->get()->result_array();
+    }
+
     public function save_payment_bill(array $payload)
     {
-        if ($payload['bill_id'] <= 0) {
-            return FALSE;
-        }
-
-        $status = $this->normalize_bill_status($payload['bill_status']);
-        $data = array(
-            'base_price' => $payload['base_price'],
-            'deposit_amount' => $payload['deposit_amount'],
-            'due_date' => $payload['due_date'],
-            'paid_total' => $payload['paid_total'] === null ? 0 : $payload['paid_total'],
-            'past_due_amount' => $payload['past_due_amount'] === null ? 0 : $payload['past_due_amount'],
-            'future_due_amount' => $payload['future_due_amount'] === null ? 0 : $payload['future_due_amount'],
-            'bill_status' => $status,
-            'notes' => $payload['notes'] !== '' ? $payload['notes'] : null,
-        );
-
-        return $this->db->where('id', $payload['bill_id'])->update('gh_room_bills', $data);
+        $this->payment_error='Tagihan bersifat baca-saja dan diterbitkan otomatis dari kesepakatan sewa.';
+        return FALSE;
     }
 
     public function save_payment(array $payload)
     {
-        if ($payload['room_bill_id'] <= 0 || $payload['amount'] === null || $payload['amount'] <= 0) {
-            return FALSE;
-        }
-
-        $this->db->trans_start();
-        $data = array(
-            'room_bill_id' => $payload['room_bill_id'],
-            'payment_date' => $payload['payment_date'],
-            'payment_date_text' => $payload['payment_date_text'] !== '' ? $payload['payment_date_text'] : null,
-            'amount' => $payload['amount'],
-            'payment_type' => in_array($payload['payment_type'], array('rent', 'deposit', 'other'), TRUE) ? $payload['payment_type'] : 'rent',
-            'method' => $payload['method'] !== '' ? $payload['method'] : null,
-            'reference_no' => $payload['reference_no'] !== '' ? $payload['reference_no'] : null,
-            'notes' => $payload['notes'] !== '' ? $payload['notes'] : null,
-        );
-
-        if ($payload['payment_id'] > 0) {
-            $this->db->where('id', $payload['payment_id'])->update('gh_payments', $data);
-        } else {
-            $data['source_key'] = 'MASTER|' . date('YmdHis') . '|' . random_int(1000, 9999);
-            $this->db->insert('gh_payments', $data);
-        }
-
-        $this->refresh_bill_payment_total($payload['room_bill_id']);
-        $this->db->trans_complete();
-
-        return $this->db->trans_status();
+        $this->payment_error='';$id=(int)($payload['payment_id']??0);
+        $oldPeek=$id>0?$this->db->where('id',$id)->get('gh_payments')->row_array():NULL;
+        $billId=(int)($payload['room_bill_id']??($oldPeek['room_bill_id']??0));
+        $peek=$billId>0?$this->db->where('id',$billId)->get('gh_room_bills')->row_array():NULL;
+        if(!$peek){$this->payment_error='Tagihan pembayaran tidak ditemukan.';return FALSE;}
+        $this->db->trans_begin();
+        try {
+            $stay=!empty($peek['stay_id'])?$this->db->query('SELECT * FROM gh_tenant_stays WHERE id=? FOR UPDATE',array($peek['stay_id']))->row_array():NULL;
+            $bill=$this->db->query('SELECT * FROM gh_room_bills WHERE id=? FOR UPDATE',array($billId))->row_array();
+            if(!$bill||(int)$bill['stay_id']!==(int)$peek['stay_id'])throw new RuntimeException('Hubungan tagihan berubah. Muat ulang formulir.');
+            if($id>0){
+                $old=$this->db->query('SELECT * FROM gh_payments WHERE id=? FOR UPDATE',array($id))->row_array();
+                if(!$old||(int)$old['room_bill_id']!==$billId)throw new RuntimeException('Transaksi historis tidak dapat dipindahkan ke tagihan lain.');
+                foreach(array('amount','payment_type','method','payment_date','payment_date_text','reference_no') as $field)if(array_key_exists($field,$payload)&&(string)$payload[$field] !== (string)$old[$field])throw new RuntimeException('Nilai, tipe, metode, tanggal, dan referensi pembayaran historis tidak dapat diubah. Hanya catatan yang dapat disunting.');
+                $this->db->where('id',$id)->update('gh_payments',array('notes'=>trim((string)($payload['notes']??''))?:NULL));
+            } else {
+                $type=$payload['payment_type']??'';$amount=$payload['amount']??NULL;$date=$payload['payment_date']??'';$key=$payload['request_key']??'';
+                if(!in_array($type,array('rent','deposit'),TRUE)||!is_numeric($amount)||(int)$amount<1||(string)(int)$amount!==(string)$amount||!$this->valid_flow_date($date)||!is_string($key)||!preg_match('/^[A-Za-z0-9_-]{16,100}$/D',$key))throw new RuntimeException('Pilih Sewa/Deposit, tanggal valid, nominal otomatis, dan muat ulang formulir pembayaran.');
+                if(isset($payload['method'])&&$payload['method']!==''&&$payload['method']!=='Transfer')throw new RuntimeException('Pembayaran baru hanya menggunakan metode Transfer.');
+                $source='REQUEST|'.hash('sha256',$key);$notes=trim((string)($payload['notes']??''));$dateText=trim((string)($payload['payment_date_text']??''));
+                $duplicate=$this->db->query('SELECT * FROM gh_payments WHERE source_key=? FOR UPDATE',array($source))->row_array();
+                if($duplicate){
+                    if((int)$duplicate['room_bill_id']!==$billId||$duplicate['payment_type']!==$type||(int)$duplicate['amount']!==(int)$amount||$duplicate['payment_date']!==$date||$duplicate['method']!=='Transfer'||(string)$duplicate['notes']!==$notes||(string)$duplicate['payment_date_text']!==$dateText)throw new RuntimeException('Kunci transaksi sudah digunakan untuk data pembayaran berbeda.');
+                    $this->db->trans_commit();return TRUE;
+                }
+                $payments=$this->db->query('SELECT * FROM gh_payments WHERE room_bill_id=? FOR UPDATE',array($billId))->result_array();$rent=0;foreach($payments as $p)if($p['payment_type']==='rent')$rent+=(int)$p['amount'];
+                $ledger=$stay?$this->db->query('SELECT * FROM gh_deposit_transactions WHERE stay_id=? FOR UPDATE',array($stay['id']))->result_array():array();
+                $deposits=$stay?$this->db->query("SELECT pay.* FROM gh_payments pay INNER JOIN gh_room_bills b ON b.id=pay.room_bill_id WHERE b.stay_id=? AND pay.payment_type='deposit' FOR UPDATE",array($stay['id']))->result_array():array();
+                $quote=$this->settlement_quote($bill,$stay,$rent,$ledger,$deposits);$remaining=$quote[$type.'_remaining'];
+                if(!$quote['can_pay_'.$type]||(int)$amount!==$remaining)throw new RuntimeException('Nominal harus sama dengan sisa '.($type==='rent'?'sewa':'deposit').' terkini. Muat ulang formulir; pembayaran kurang/lebih tidak disimpan.');
+                $data=array('room_bill_id'=>$billId,'payment_date'=>$date,'payment_date_text'=>$dateText?:NULL,'amount'=>$remaining,'payment_type'=>$type,'method'=>'Transfer','reference_no'=>NULL,'notes'=>$notes?:NULL,'source_key'=>$source);
+                if(!$this->db->insert('gh_payments',$data))throw new RuntimeException('Pembayaran belum tersimpan. Muat ulang dan periksa transaksi.');
+                $paymentId=(int)$this->db->insert_id();
+                if($type==='deposit')$this->db->insert('gh_deposit_transactions',array('source_payment_id'=>$paymentId,'tenant_id'=>$bill['tenant_id'],'room_id'=>$bill['room_id'],'stay_id'=>$stay['id'],'transaction_date'=>$date,'transaction_type'=>'received','amount'=>$remaining,'method'=>'Transfer','reference_no'=>NULL,'description'=>'Deposit dari transaksi pembayaran #'.$paymentId));
+                $this->refresh_bill_payment_total($billId);
+            }
+            if(!$this->db->trans_status())throw new RuntimeException('Pembayaran gagal disimpan; tidak ada perubahan yang diterapkan.');
+            $this->db->trans_commit();return TRUE;
+        } catch(Throwable $e){$this->db->trans_rollback();$this->payment_error=$e instanceof RuntimeException?$e->getMessage():'Pembayaran belum tersimpan. Periksa tagihan dan coba kembali.';return FALSE;}
     }
 
     public function delete_payment($id)
     {
-        $payment = $this->db->where('id', $id)->get('gh_payments')->row_array();
+        $this->db->trans_begin();
+        $payment = $this->db->query('SELECT * FROM gh_payments WHERE id=? FOR UPDATE', array((int) $id))->row_array();
         if ( ! $payment) {
+            $this->db->trans_rollback();
             return FALSE;
         }
+        if ($this->db->table_exists('gh_resident_cases')) {
+            $linkedBill=$this->db->where('id',$payment['room_bill_id'])->get('gh_room_bills')->row_array();
+            if ($linkedBill && $this->db->where('stay_id',(int)$linkedBill['stay_id'])->where('payment_verified_at IS NOT NULL',NULL,FALSE)->count_all_results('gh_resident_cases')) { $this->db->trans_rollback(); return FALSE; }
+        }
 
-        $this->db->trans_start();
+        if (! $this->deposit_payment_can_change($payment, array('payment_type' => 'rent', 'room_bill_id' => $payment['room_bill_id'], 'amount' => 0))) {
+            $this->db->trans_rollback();
+            return FALSE;
+        }
+        $proofs = array();
+        if ($this->db->table_exists('gh_payment_proofs')) {
+            $this->load->model('Payment_proof_model');
+            $proofs = $this->Payment_proof_model->lock_and_collect((int) $id);
+            if ($proofs === FALSE) { $this->db->trans_rollback(); return FALSE; }
+        }
         $this->db->where('id', $id)->delete('gh_payments');
+        if ($this->db->table_exists('gh_deposit_transactions') && $this->db->field_exists('source_payment_id', 'gh_deposit_transactions')) {
+            $this->db->where('source_payment_id', (int) $id)->delete('gh_deposit_transactions');
+        }
         $this->refresh_bill_payment_total((int) $payment['room_bill_id']);
-        $this->db->trans_complete();
-
-        return $this->db->trans_status();
+        if (! $this->db->trans_status()) { $this->db->trans_rollback(); return FALSE; }
+        $this->db->trans_commit();
+        if ($proofs) {
+            $cleanup = $this->Payment_proof_model->cleanup_files($proofs);
+            if ($cleanup['cleanup_pending']) $this->session->set_flashdata('warning', 'Pembayaran dihapus. Pembersihan berkas bukti privat tertunda dan tercatat untuk dicoba kembali.');
+        }
+        return TRUE;
     }
 
     private function normalize_room_status($status)
@@ -539,6 +622,7 @@ class Master_model extends CI_Model
         $row = $this->db
             ->select('COALESCE(SUM(amount), 0) AS total', FALSE)
             ->where('room_bill_id', $billId)
+            ->where('payment_type', 'rent')
             ->get('gh_payments')
             ->row_array();
         $bill = $this->db->where('id', $billId)->get('gh_room_bills')->row_array();
@@ -563,7 +647,25 @@ class Master_model extends CI_Model
             ->update('gh_room_bills', array(
                 'paid_total' => $total,
                 'bill_status' => $status,
+                'past_due_amount' => $bill && ! in_array($status, array('empty', 'internal', 'reserved'), TRUE) && $bill['due_date'] && $bill['due_date'] < date('Y-m-d') ? max(0, (int) $bill['base_price'] - $total) : 0,
+                'future_due_amount' => $bill && ! in_array($status, array('empty', 'internal', 'reserved'), TRUE) && (! $bill['due_date'] || $bill['due_date'] >= date('Y-m-d')) ? max(0, (int) $bill['base_price'] - $total) : 0,
             ));
+    }
+
+    private function valid_flow_date($value)
+    {
+        return is_string($value) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $parts) && checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]);
+    }
+
+    private function deposit_payment_can_change(array $payment, array $replacement)
+    {
+        if (! $this->db->field_exists('source_payment_id', 'gh_deposit_transactions')) return TRUE;
+        $ledger = $this->db->where('source_payment_id', $payment['id'])->get('gh_deposit_transactions')->row_array();
+        if (! $ledger) return TRUE;
+        $this->db->query('SELECT id FROM gh_tenant_stays WHERE id = ? FOR UPDATE', array($ledger['stay_id']));
+        $row = $this->db->select("COALESCE(SUM(CASE WHEN transaction_type IN ('received','adjustment') THEN amount ELSE -CAST(amount AS SIGNED) END),0) AS balance", FALSE)->where('stay_id', $ledger['stay_id'])->get('gh_deposit_transactions')->row_array();
+        $sameDeposit = $replacement['payment_type'] === 'deposit' && (int) $replacement['room_bill_id'] === (int) $payment['room_bill_id'];
+        return (int) $row['balance'] - (int) $ledger['amount'] + ($sameDeposit ? (int) $replacement['amount'] : 0) >= 0;
     }
 
     private function apply_payment_filters(array $filters)

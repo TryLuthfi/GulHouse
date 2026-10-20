@@ -12,7 +12,9 @@ class Dashboard extends CI_Controller
 
     public function index()
     {
+        $selectedPeriod = $this->Dashboard_model->set_period($this->input->get('period', TRUE));
         $data = array(
+            'selected_period' => $selectedPeriod,
             'title' => 'Dashboard Master | GUL HOUSE',
             'admin_name' => $this->session->userdata('gh_admin_name'),
             'summary' => $this->Dashboard_model->get_summary(),
@@ -24,13 +26,21 @@ class Dashboard extends CI_Controller
             'charts' => $this->Dashboard_model->get_charts(),
         );
 
+        $role = $this->session->userdata('gh_admin_role');
+        if (in_array($role, array('finance', 'maintenance'), TRUE)) $data['booking_rows'] = array();
+        if ($role === 'maintenance') {
+            $data['payment_rows'] = array();
+            $data['payment_issue_rows'] = array();
+        }
+
         $this->load->view('dashboard/index', $data);
     }
 
     private function require_login()
     {
         if ( ! $this->session->userdata('gh_admin_logged_in')) {
-            redirect('login');
+            $this->session->set_flashdata('error', 'Sesi belum aktif. Silakan login terlebih dahulu.');
+            redirect('login', 'location', 303);
         }
     }
 }

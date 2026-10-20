@@ -71,27 +71,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261001-partial-metric'); ?>">
-</head>
-<body>
-    <aside class="sidebar">
-        <a class="brand" href="<?= base_url('dashboard'); ?>"><span>GH</span><strong>GUL HOUSE</strong></a>
-        <nav>
-            <a href="<?= base_url('dashboard'); ?>">Dashboard</a>
-            <a href="<?= base_url('properties'); ?>">Properti</a>
-            <a href="<?= base_url('room-types'); ?>">Tipe Kamar</a>
-            <a class="is-active" href="<?= base_url('rooms'); ?>">Kamar</a>
-            <a href="<?= base_url('tenants'); ?>">Penghuni</a>
-            <a href="<?= base_url('payments'); ?>">Pembayaran</a>
-            <a href="<?= base_url('photos'); ?>">Foto</a>
-            <a href="#">Booking</a>
-        </nav>
-    </aside>
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261020-admin-ui-1'); ?>">
+<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script></head>
+<body class="gh-admin-ui">
+    <?php $this->load->view('partials/sidebar', array('active_menu' => 'rooms')); ?>
 
     <main class="main-shell">
         <header class="topbar">
             <div><p>Master Data</p><h1>Kamar Internal</h1></div>
-            <div class="admin-chip"><span><?= html_escape($admin_name); ?></span><a href="<?= base_url('logout'); ?>">Logout</a></div>
+            <div class="admin-chip"><span><?= html_escape($admin_name); ?></span><?php $this->load->view('partials/logout'); ?></div>
         </header>
 
         <?php if ($this->session->flashdata('success')): ?><div class="notice success"><?= html_escape($this->session->flashdata('success')); ?></div><?php endif; ?>
@@ -236,10 +224,10 @@
                     </div>
                     <div class="form-section">
                         <h3 class="form-section-title">Identitas Kamar</h3>
-                        <label>Kode Kamar<input type="text" name="room_code" required value="<?= html_escape($modalRoom['room_code']); ?>" placeholder="A-101"></label>
-                        <label>Nama<input type="text" name="room_name" value="<?= html_escape($modalRoom['room_name']); ?>" placeholder="Cappadocia"></label>
-                        <label>Label<input type="text" name="room_label" value="<?= html_escape($modalRoom['room_label']); ?>" placeholder="Cappadocia 101"></label>
-                        <label>Lantai<input type="number" name="floor_no" min="0" value="<?= html_escape((string) $modalRoom['floor_no']); ?>"></label>
+                        <label>Kode Kamar<input type="text" name="room_code" maxlength="30" required value="<?= html_escape($modalRoom['room_code']); ?>" placeholder="A-101"></label>
+                        <label>Nama<input type="text" name="room_name" maxlength="100" value="<?= html_escape($modalRoom['room_name']); ?>" placeholder="Cappadocia"></label>
+                        <label>Label<input type="text" name="room_label" maxlength="150" value="<?= html_escape($modalRoom['room_label']); ?>" placeholder="Cappadocia 101"></label>
+                        <label>Lantai<input type="number" name="floor_no" min="0" max="255" value="<?= html_escape((string) $modalRoom['floor_no']); ?>"></label>
                     </div>
                     <div class="form-section">
                         <h3 class="form-section-title">Harga dan Deposit</h3>
@@ -270,6 +258,6 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js?v=20261001-partial-metric'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
 </body>
 </html>

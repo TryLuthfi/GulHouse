@@ -25,6 +25,13 @@ if ( ! function_exists('gulhouse_load_env')) {
 }
 
 $env = gulhouse_load_env();
+// Keep test and demo databases separate from operational data.
+foreach (array('HOSTNAME', 'DB_PORT', 'USERNAME', 'PASSWORD', 'GULHOUSE_DATABASE') as $key) {
+    $value = getenv('GH_DB_' . $key);
+    if ($value !== FALSE) $env[$key] = $value;
+}
+$databaseOverride = getenv('GULHOUSE_DATABASE');
+if ($databaseOverride !== FALSE && $databaseOverride !== '') $env['GULHOUSE_DATABASE'] = $databaseOverride;
 $host = isset($env['HOSTNAME']) ? trim((string) $env['HOSTNAME']) : '127.0.0.1';
 $port = isset($env['DB_PORT']) && ctype_digit((string) $env['DB_PORT']) ? (int) $env['DB_PORT'] : 3306;
 
