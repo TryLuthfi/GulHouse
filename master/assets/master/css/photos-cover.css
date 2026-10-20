@@ -1,0 +1,26 @@
+/* Cover selection is scoped to the photo manager. */
+.gh-admin-ui .photo-cover-form {
+    margin: 0;
+    min-width: 0;
+}
+
+.gh-admin-ui .photo-cover-form .photo-cover-submit {
+    width: 100%;
+    color: #fff;
+    background: var(--admin-primary, #2563eb);
+    border-color: var(--admin-primary, #2563eb);
+}
+
+.gh-admin-ui .photo-cover-form .photo-cover-submit:hover {
+    color: #fff;
+    background: var(--admin-primary-hover, #1d4ed8);
+    border-color: var(--admin-primary-hover, #1d4ed8);
+}
+
+.gh-admin-ui .photo-card .photo-cover-status {
+    justify-self: start;
+    color: #1d4ed8;
+    background: #eff6ff;
+    text-transform: none;
+    font-weight: 600;
+}

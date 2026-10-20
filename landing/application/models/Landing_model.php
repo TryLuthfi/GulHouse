@@ -1,5 +1,7 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
+require_once dirname(__DIR__, 3) . '/master/application/libraries/Gallery_cover.php';
+require_once dirname(__DIR__, 3) . '/master/application/libraries/Landing_photos.php';
 
 class Landing_model extends CI_Model
 {
@@ -457,144 +459,27 @@ class Landing_model extends CI_Model
 
     public function get_preview_photos($limit = 4)
     {
-        $root = realpath(FCPATH . '../uploads');
-        $allowed = array('jpg', 'jpeg', 'png', 'webp');
-        $photos = array();
-        $limit = max(1, (int) $limit);
-
-        if (! $root || ! is_dir($root)) {
-            return $this->fallback_preview_photos($limit);
-        }
-
-        foreach (new DirectoryIterator($root) as $propertyDir) {
-            if (! $propertyDir->isDir() || $propertyDir->isDot()) {
-                continue;
-            }
-
-            $property = strtoupper($propertyDir->getFilename());
-            if ($property === 'SLIDER') {
-                continue;
-            }
-
-            foreach (new DirectoryIterator($propertyDir->getPathname()) as $typeDir) {
-                if (! $typeDir->isDir() || $typeDir->isDot()) {
-                    continue;
-                }
-
-                foreach (new DirectoryIterator($typeDir->getPathname()) as $file) {
-                    if (! $file->isFile()) {
-                        continue;
-                    }
-
-                    $extension = strtolower($file->getExtension());
-                    if (! in_array($extension, $allowed, TRUE)) {
-                        continue;
-                    }
-
-                    $filename = $file->getFilename();
-                    $category = $this->gallery_category_from_filename($filename);
-                    $photos[] = array(
-                        'category' => $category,
-                        'title' => $this->gallery_title_from_filename($filename, $category, $propertyDir->getFilename(), $typeDir->getFilename()),
-                        'src' => base_url('index.php/media/gallery/' . rawurlencode($propertyDir->getFilename()) . '/' . rawurlencode($typeDir->getFilename()) . '/' . rawurlencode($filename)),
-                        'filename' => $filename,
-                    );
-                }
-            }
-        }
-
-        usort($photos, function ($left, $right) {
-            $leftScore = stripos($left['filename'], 'kamar_01') === 0 ? 0 : (stripos($left['filename'], 'kamar') === 0 ? 1 : 2);
-            $rightScore = stripos($right['filename'], 'kamar_01') === 0 ? 0 : (stripos($right['filename'], 'kamar') === 0 ? 1 : 2);
-
-            if ($leftScore === $rightScore) {
-                return strnatcasecmp($left['title'], $right['title']);
-            }
-
-            return $leftScore - $rightScore;
-        });
-
-        return $photos ? $this->select_diverse_preview_photos($photos, $limit) : $this->fallback_preview_photos($limit);
+        return $this->configured_landing_photos('preview', $limit);
     }
 
-    private function select_diverse_preview_photos(array $photos, $limit)
+    public function get_daily_living_photo()
     {
-        $picked = array();
-        $usedKeys = array();
-        $usedIndexes = array();
-
-        foreach ($photos as $index => $photo) {
-            $key = isset($photo['category']) ? strtolower($photo['category']) : 'foto';
-            if (isset($usedKeys[$key])) {
-                continue;
-            }
-            $picked[] = $photo;
-            $usedKeys[$key] = TRUE;
-            $usedIndexes[$index] = TRUE;
-            if (count($picked) >= $limit) {
-                return $picked;
-            }
-        }
-
-        foreach ($photos as $index => $photo) {
-            if (isset($usedIndexes[$index])) {
-                continue;
-            }
-            $picked[] = $photo;
-            if (count($picked) >= $limit) {
-                break;
-            }
-        }
-
-        return array_slice($picked, 0, $limit);
+        $photos=$this->configured_landing_photos('daily',1);
+        return $photos ? $photos[0] : null;
     }
 
-    private function fallback_preview_photos($limit = 4, $roomName = 'GUL HOUSE')
+    private function configured_landing_photos($slot,$limit)
     {
-        $photos = array(
-            array(
-                'category' => 'Kamar',
-                'title' => $roomName . ' - Sudut tidur',
-                'src' => 'https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=1400&q=86',
-            ),
-            array(
-                'category' => 'Kamar',
-                'title' => $roomName . ' - Area kerja',
-                'src' => 'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1400&q=86',
-            ),
-            array(
-                'category' => 'Kamar',
-                'title' => $roomName . ' - Penyimpanan',
-                'src' => 'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=1400&q=86',
-            ),
-            array(
-                'category' => 'Kamar Mandi',
-                'title' => 'Kamar mandi bersih',
-                'src' => 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=1400&q=86',
-            ),
-            array(
-                'category' => 'Fasilitas',
-                'title' => 'Koridor dan akses',
-                'src' => 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1400&q=86',
-            ),
-            array(
-                'category' => 'Fasilitas',
-                'title' => 'Ruang bersama',
-                'src' => 'https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?auto=format&fit=crop&w=1400&q=86',
-            ),
-            array(
-                'category' => 'Area Umum',
-                'title' => 'Area santai',
-                'src' => 'https://images.unsplash.com/photo-1600210492493-0946911123ea?auto=format&fit=crop&w=1400&q=86',
-            ),
-            array(
-                'category' => 'Area Umum',
-                'title' => 'Fasad properti',
-                'src' => 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=86',
-            ),
-        );
-
-        return array_slice($photos, 0, max(1, (int) $limit));
+        $root=realpath(FCPATH.'../uploads'); if(!$root)return array();
+        $selection=Gulhouse_landing_photos::read($root); $catalog=Gulhouse_landing_photos::catalog($root);
+        $keys=$slot==='daily'?array($selection['daily']):$selection['preview']; $out=array();
+        foreach(array_slice($keys,0,max(1,(int)$limit)) as $key) {
+            if(!isset($catalog[$key]))continue;
+            $p=$catalog[$key];$category=$this->gallery_category_from_filename($p['file']);
+            $out[]=array('category'=>$category,'title'=>$this->gallery_title_from_filename($p['file'],$category,$p['property'],$p['type']),
+                'src'=>base_url('index.php/media/gallery/'.implode('/',array_map('rawurlencode',explode('/',$key)))));
+        }
+        return $out;
     }
 
     private function get_uploaded_room_gallery(array $room)
@@ -635,7 +520,11 @@ class Landing_model extends CI_Model
             );
         }
 
-        usort($gallery, function ($left, $right) {
+        $cover = Gulhouse_gallery_cover::selected($directory);
+        $coverUrl = $cover === '' ? '' : base_url('index.php/media/gallery/' . rawurlencode($code) . '/' . rawurlencode($type) . '/' . rawurlencode($cover));
+        usort($gallery, function ($left, $right) use ($coverUrl) {
+            if ($left['src'] === $coverUrl && $right['src'] !== $coverUrl) return -1;
+            if ($right['src'] === $coverUrl && $left['src'] !== $coverUrl) return 1;
             $order = array('Kamar' => 1, 'Kamar Mandi' => 2, 'Fasilitas' => 3, 'Area Umum' => 4);
             $leftOrder = isset($order[$left['category']]) ? $order[$left['category']] : 99;
             $rightOrder = isset($order[$right['category']]) ? $order[$right['category']] : 99;
@@ -660,42 +549,11 @@ class Landing_model extends CI_Model
         }
 
         $directory = realpath(FCPATH . '../uploads/' . $code . '/' . $type);
-        $allowed = array('jpg', 'jpeg', 'png', 'webp');
-        $files = array();
-
         if (! $directory || ! is_dir($directory)) {
             return '';
         }
-
-        foreach (new DirectoryIterator($directory) as $file) {
-            if (! $file->isFile()) {
-                continue;
-            }
-
-            $extension = strtolower($file->getExtension());
-            if (! in_array($extension, $allowed, TRUE)) {
-                continue;
-            }
-
-            $files[] = $file->getFilename();
-        }
-
-        if (! $files) {
-            return '';
-        }
-
-        usort($files, function ($left, $right) {
-            $leftScore = stripos($left, 'kamar_01') === 0 ? 0 : (stripos($left, 'kamar') === 0 ? 1 : 2);
-            $rightScore = stripos($right, 'kamar_01') === 0 ? 0 : (stripos($right, 'kamar') === 0 ? 1 : 2);
-
-            if ($leftScore === $rightScore) {
-                return strnatcasecmp($left, $right);
-            }
-
-            return $leftScore - $rightScore;
-        });
-
-        return base_url('index.php/media/gallery/' . rawurlencode($code) . '/' . rawurlencode($type) . '/' . rawurlencode($files[0]));
+        $file = Gulhouse_gallery_cover::selected($directory);
+        return $file === '' ? '' : base_url('index.php/media/gallery/' . rawurlencode($code) . '/' . rawurlencode($type) . '/' . rawurlencode($file));
     }
 
     private function gallery_category_from_filename($filename)
@@ -1226,12 +1084,7 @@ class Landing_model extends CI_Model
 
     private function public_property_city($code,$city,$address)
     {
-        if(trim((string)$city)!=='')return trim((string)$city);
-        if(preg_match('/\b(?:Kota|Kabupaten)\s+([^,;\r\n]+?)(?=\s+[0-9]{5}\b|[,;\r\n]|$)/iu',(string)$address,$match))return mb_convert_case(trim($match[1]),MB_CASE_TITLE,'UTF-8');
-        // Verified existing landing map addresses for GH 1/GH 2; never infer an unknown apartment city.
-        $verified=array('GH1'=>'Jakarta Barat','GH2'=>'Jakarta Barat');
-        $key=preg_replace('/[^A-Z0-9]/','',strtoupper((string)$code));
-        return $verified[$key]??'';
+        return trim((string)$city);
     }
 
     private function fallback_public_room_type_cards()

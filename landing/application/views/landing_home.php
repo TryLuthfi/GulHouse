@@ -31,7 +31,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20261020-landing-tidy'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20261021-landing-photos'); ?>">
 </head>
 <body>
     <header class="site-header" id="top">
@@ -68,7 +68,7 @@
             <div class="hero-copy reveal">
                 <p class="eyebrow">Kos premium siap huni</p>
                 <h1>GUL HOUSE</h1>
-                <p class="hero-lead">Hunian bulanan yang rapi, nyaman, dan mudah dikelola. Pilih kamar, jadwalkan survey, lalu masuk tanpa proses yang bertele-tele.</p>
+                <p class="hero-lead">Hunian bulanan yang rapi dan nyaman. Temukan kamar sesuai kebutuhan, lihat fasilitasnya, lalu jadwalkan survey bersama pengelola.</p>
                 <div class="hero-actions">
                     <a class="btn btn-primary glow-button" href="#booking" data-booking-open>Booking Survey</a>
                     <a class="btn btn-ghost" href="<?= base_url('resident/start'); ?>">Daftar Penghuni</a>
@@ -77,7 +77,7 @@
                 <div class="hero-badges" role="list" aria-label="Ringkasan layanan">
                     <span role="listitem">Survey terjadwal</span>
                     <span role="listitem">Harga bulanan jelas</span>
-                    <span role="listitem">Data kamar dari master</span>
+                    <span role="listitem">Pilihan kamar sesuai kebutuhan</span>
                 </div>
             </div>
             <div class="hero-panel reveal delay-1" role="group" aria-label="Ringkasan ketersediaan">
@@ -108,12 +108,12 @@
             <div class="reveal">
                 <span>01</span>
                 <strong>Foto & tipe jelas</strong>
-                <p>Calon penghuni melihat pilihan berdasarkan gedung dan tipe kamar, bukan nomor internal.</p>
+                <p>Jelajahi pilihan gedung dan tipe kamar untuk menemukan hunian yang cocok.</p>
             </div>
             <div class="reveal delay-1">
                 <span>02</span>
                 <strong>Survey cepat</strong>
-                <p>Form booking dibuat ringkas agar admin bisa langsung follow up jadwal survey.</p>
+                <p>Isi formulir singkat, lalu pengelola akan menghubungi Anda untuk menjadwalkan survey.</p>
             </div>
             <div class="reveal delay-2">
                 <span>03</span>
@@ -180,7 +180,7 @@
             <div class="section-copy reveal">
                 <p class="eyebrow">Ketersediaan</p>
                 <h2>Pilih gedung dan tipe kamar yang paling pas.</h2>
-                <p>Landing page menampilkan ringkasan per properti. Harga yang tampil adalah harga terendah dari tipe kamar yang tersedia di masing-masing properti.</p>
+                <p>Bandingkan lokasi dan pilihan kamar di setiap properti. Harga mulai mengikuti tipe kamar yang tersedia.</p>
             </div>
             <div class="type-grid property-room-grid">
                 <?php $propertyIndex = 0; ?>
@@ -208,7 +208,7 @@
             <div class="section-copy reveal">
                 <p class="eyebrow">Snapshot</p>
                 <h2>Stok kamar kebaca dalam sekali lihat.</h2>
-                <p>Calon penghuni bisa memilih dari tipe tersedia, lalu lanjut ke detail tanpa melihat nomor kamar yang dipakai untuk operasional master.</p>
+                <p>Lihat ketersediaan di setiap properti, lalu pilih tipe kamar untuk melihat harga dan fasilitasnya.</p>
             </div>
             <div class="insight-panel reveal delay-1">
                 <?php foreach (array_slice($property_stats, 0, 4) as $index => $stat): ?>
@@ -292,7 +292,7 @@
             <div class="section-copy reveal">
                 <p class="eyebrow">Preview foto</p>
                 <h2>Nuansa kamar, area santai, dan living space.</h2>
-                <p>Foto di bagian ini mengikuti data master foto. Placeholder sementara bisa diganti kapan saja dari halaman master.</p>
+                <p>Lihat suasana kamar dan fasilitas bersama sebelum menjadwalkan survey.</p>
             </div>
             <div class="preview-mosaic reveal delay-1">
                 <?php foreach ($preview_photos as $index => $photo): ?>
@@ -319,7 +319,7 @@
             </div>
         </section>
 
-        <section class="visual-band" data-parallax data-parallax-speed="0.18">
+        <section class="visual-band"<?php if (!empty($daily_living_photo['src'])): ?> style="background-image: linear-gradient(180deg, rgba(15,36,31,.08), rgba(15,36,31,.8)), url('<?= html_escape($daily_living_photo['src']); ?>')"<?php endif; ?>>
             <div class="visual-copy reveal">
                 <p class="eyebrow">Daily living</p>
                 <h2>Tenang buat tinggal, jelas buat bayar, gampang buat lapor.</h2>
@@ -474,7 +474,7 @@
                 <article class="process-card reveal delay-2">
                     <span>3</span>
                     <h3>Survey</h3>
-                    <p>Admin mengatur jadwal survey dan mengunci opsi kamar yang paling cocok.</p>
+                    <p>Lihat langsung kondisi dan fasilitas kamar saat survey untuk menemukan pilihan yang sesuai kebutuhan Anda.</p>
                 </article>
                 <article class="process-card reveal delay-3">
                     <span>4</span>
@@ -505,7 +505,7 @@
                         <span></span>
                     </button>
                     <div class="accordion-panel">
-                        <p>Landing page sudah disiapkan membaca data kamar dari MySQL. Nanti saat web master aktif, status publik bisa dikontrol dari dashboard.</p>
+                        <p>Harga dan ketersediaan mengikuti pembaruan pengelola. Konfirmasikan kembali pilihan kamar saat menjadwalkan survey.</p>
                     </div>
                 </div>
                 <div class="accordion-item">
@@ -514,7 +514,7 @@
                         <span></span>
                     </button>
                     <div class="accordion-panel">
-                        <p>Ya. Alur deposit akan masuk ke modul master agar pembayaran masuk, potongan, dan pengembalian deposit bisa dilacak.</p>
+                        <p>Ya. Pembayaran deposit, potongan jika ada, dan pengembaliannya dicatat agar dapat ditinjau bersama pengelola.</p>
                     </div>
                 </div>
             </div>
@@ -524,7 +524,7 @@
             <div class="booking-copy reveal">
                 <p class="eyebrow">Booking</p>
                 <h2>Jadwalkan survey kamar.</h2>
-                <p>Isi data singkat. Tim GUL HOUSE dapat menindaklanjuti dari dashboard master setelah modul booking aktif.</p>
+                <p>Isi data singkat. Tim GUL HOUSE akan menghubungi Anda melalui WhatsApp untuk mengonfirmasi jadwal survey.</p>
                 <?php if ($this->session->flashdata('success')): ?>
                     <div class="alert success"><?= html_escape($this->session->flashdata('success')); ?></div>
                 <?php elseif ($this->session->flashdata('warning')): ?>
@@ -548,7 +548,7 @@
                 <button type="button" class="booking-modal-close" data-booking-close aria-label="Tutup modal booking">&times;</button>
                 <p class="eyebrow">Booking</p>
                 <h2 id="booking-modal-title">Jadwalkan survey kamar.</h2>
-                <p>Isi data singkat. Tim GUL HOUSE akan follow up dari dashboard master.</p>
+                <p>Isi data singkat. Tim GUL HOUSE akan menghubungi Anda melalui WhatsApp untuk mengonfirmasi jadwal survey.</p>
                 <?php if ($bookingError !== ''): ?>
                     <div class="alert warning booking-error" id="booking-error-message" role="alert" tabindex="-1"><strong>Booking belum terkirim.</strong> <?= html_escape($bookingError); ?></div>
                 <?php endif; ?>

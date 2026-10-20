@@ -94,19 +94,20 @@
                     </select>
                 </label>
                 <label>Cari
-                    <input type="search" name="q" value="<?= html_escape($filters['q']); ?>" placeholder="Kode, nama, alamat">
+                    <input type="search" name="q" value="<?= html_escape($filters['q']); ?>" placeholder="Kode, nama, kota, alamat">
                 </label>
                 <button type="submit">Tampilkan</button>
                 <a class="mini-link" href="<?= base_url('properties'); ?>">Reset</a>
             </form>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>Kode</th><th>Nama</th><th>Tipe</th><th>Status</th><th>Aksi</th></tr></thead>
+                    <thead><tr><th>Kode</th><th>Nama</th><th>Kota</th><th>Tipe</th><th>Status</th><th>Aksi</th></tr></thead>
                     <tbody>
                         <?php foreach ($rows as $row): ?>
                             <tr>
                                 <td><strong><?= html_escape($row['code']); ?></strong></td>
                                 <td><?= html_escape($row['name']); ?></td>
+                                <td><?= html_escape(isset($row['city']) && trim((string) $row['city']) !== '' ? $row['city'] : '-'); ?></td>
                                 <td><?= html_escape(ucfirst($row['property_type'])); ?></td>
                                 <td><span class="badge <?= (int) $row['is_active'] ? 'good' : 'muted'; ?>"><?= (int) $row['is_active'] ? 'Aktif' : 'Nonaktif'; ?></span></td>
                                 <td>
@@ -117,7 +118,7 @@
                                 </td>
                             </tr>
                         <?php endforeach; ?>
-                        <?php if ( ! $rows): ?><tr><td colspan="5">Belum ada properti.</td></tr><?php endif; ?>
+                        <?php if ( ! $rows): ?><tr><td colspan="6">Belum ada properti.</td></tr><?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -145,6 +146,7 @@
                 </div>
                 <div class="form-section">
                     <h3 class="form-section-title">Lokasi</h3>
+                    <label class="full">Kota<input type="text" name="city" maxlength="120" autocomplete="address-level2" placeholder="Contoh: Jakarta Barat atau Balikpapan"></label>
                     <label class="full">Alamat<textarea name="address" rows="4" placeholder="Alamat properti"></textarea></label>
                 </div>
                 <div class="form-actions"><button type="submit">Simpan Properti</button></div>
@@ -174,6 +176,7 @@
                     </div>
                     <div class="form-section">
                         <h3 class="form-section-title">Lokasi</h3>
+                        <label class="full">Kota<input type="text" name="city" maxlength="120" autocomplete="address-level2" value="<?= html_escape(isset($row['city']) ? (string) $row['city'] : ''); ?>" placeholder="Contoh: Jakarta Barat atau Balikpapan"></label>
                         <label class="full">Alamat<textarea name="address" rows="4"><?= html_escape((string) $row['address']); ?></textarea></label>
                     </div>
                     <div class="form-actions"><button type="submit">Simpan Perubahan</button></div>

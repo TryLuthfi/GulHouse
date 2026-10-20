@@ -2,6 +2,13 @@
 <?php
     $selectedProperty = isset($selected_property) ? $selected_property : '';
     $selectedType = isset($selected_type) ? $selected_type : '';
+    $landingChoices = isset($landing_photo_choices) ? $landing_photo_choices : array();
+    $landingSelection = isset($landing_photo_selection) ? $landing_photo_selection : array();
+    $landingPreview = isset($landingSelection['preview']) ? $landingSelection['preview'] : array();
+    $landingSources = array();
+    foreach ($landingChoices as $choice) {
+        $landingSources[$choice['key']] = $choice['src'];
+    }
     $typePropertyMap = array();
     $propertyTypeMap = array();
     foreach ($room_catalog as $room) {
@@ -30,7 +37,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261020-admin-ui-1'); ?>">
-<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script></head>
+<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script><link rel="stylesheet" href="<?= base_url('assets/master/css/photos-cover.css?v=20261020-1'); ?>"><link rel="stylesheet" href="<?= base_url('assets/master/css/landing-photo-manager.css?v=20261021-1'); ?>"></head>
 <body class="gh-admin-ui">
     <?php $this->load->view('partials/sidebar', array('active_menu' => 'photos')); ?>
 
@@ -42,6 +49,56 @@
 
         <?php if ($this->session->flashdata('success')): ?><div class="notice success"><?= html_escape($this->session->flashdata('success')); ?></div><?php endif; ?>
         <?php if ($this->session->flashdata('error')): ?><div class="notice error"><?= html_escape($this->session->flashdata('error')); ?></div><?php endif; ?>
+
+        <section class="panel landing-photo-manager" aria-labelledby="landing-photo-heading">
+            <div class="panel-head">
+                <div><p>Pilihan Halaman Depan</p><h2 id="landing-photo-heading">Foto Landing — Preview &amp; Daily living</h2></div>
+            </div>
+            <p class="panel-copy" id="landing-photo-help">Pilih empat foto Preview sesuai urutan tampil, lalu satu foto untuk Daily living. Foto diambil dari galeri yang sudah diunggah.</p>
+            <?php if ($landingChoices): ?>
+                <form method="post" action="<?= base_url('photos/save-landing'); ?>" class="landing-photo-form" aria-describedby="landing-photo-help" data-landing-photo-form>
+                    <div class="landing-photo-slots">
+                        <?php for ($slot = 0; $slot < 4; $slot++): ?>
+                            <?php $selectedKey = isset($landingPreview[$slot]) ? $landingPreview[$slot] : ''; $selectedSrc = isset($landingSources[$selectedKey]) ? $landingSources[$selectedKey] : ''; ?>
+                            <article class="landing-photo-slot" data-landing-photo-slot>
+                                <div class="landing-photo-image">
+                                    <img <?= $selectedSrc !== '' ? 'src="' . html_escape($selectedSrc) . '"' : ''; ?> alt="Foto Preview <?= $slot + 1; ?> terpilih" <?= $selectedSrc === '' ? 'hidden' : ''; ?> data-landing-photo-image>
+                                    <span <?= $selectedSrc !== '' ? 'hidden' : ''; ?> data-landing-photo-empty>Belum dipilih</span>
+                                    <span class="landing-photo-order" aria-hidden="true"><?= $slot + 1; ?></span>
+                                </div>
+                                <label for="landing-preview-<?= $slot; ?>">Preview <?= $slot + 1; ?></label>
+                                <select id="landing-preview-<?= $slot; ?>" name="preview[]" required data-landing-photo-select data-landing-preview-select>
+                                    <option value="">Pilih foto Preview <?= $slot + 1; ?></option>
+                                    <?php foreach ($landingChoices as $choice): ?>
+                                        <option value="<?= html_escape($choice['key']); ?>" data-src="<?= html_escape($choice['src']); ?>" <?= $selectedKey === $choice['key'] ? 'selected' : ''; ?>><?= html_escape($choice['label']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </article>
+                        <?php endfor; ?>
+                    </div>
+                    <?php $dailyKey = isset($landingSelection['daily']) ? $landingSelection['daily'] : ''; $dailySrc = isset($landingSources[$dailyKey]) ? $landingSources[$dailyKey] : ''; ?>
+                    <article class="landing-photo-slot landing-photo-daily" data-landing-photo-slot>
+                        <div class="landing-photo-image">
+                            <img <?= $dailySrc !== '' ? 'src="' . html_escape($dailySrc) . '"' : ''; ?> alt="Foto Daily living terpilih" <?= $dailySrc === '' ? 'hidden' : ''; ?> data-landing-photo-image>
+                            <span <?= $dailySrc !== '' ? 'hidden' : ''; ?> data-landing-photo-empty>Belum dipilih</span>
+                        </div>
+                        <div class="landing-photo-daily-fields">
+                            <label for="landing-daily">Daily living</label>
+                            <p>Pilih foto suasana atau fasilitas bersama untuk bagian Daily living.</p>
+                            <select id="landing-daily" name="daily" required data-landing-photo-select>
+                                <option value="">Pilih foto Daily living</option>
+                                <?php foreach ($landingChoices as $choice): ?>
+                                    <option value="<?= html_escape($choice['key']); ?>" data-src="<?= html_escape($choice['src']); ?>" <?= $dailyKey === $choice['key'] ? 'selected' : ''; ?>><?= html_escape($choice['label']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </article>
+                    <div class="landing-photo-actions"><p>Nomor 1–4 menentukan urutan foto Preview di landing.</p><button type="submit">Simpan Foto Landing</button></div>
+                </form>
+            <?php else: ?>
+                <div class="empty-panel">Belum ada foto yang dapat dipilih. Unggah foto melalui Galeri Kamar di bawah, lalu atur pilihan Foto Landing di sini.</div>
+            <?php endif; ?>
+        </section>
 
         <section class="panel">
             <div class="panel-head">
@@ -117,7 +174,7 @@
             </form>
 
             <?php if ($selectedProperty && $selectedType): ?>
-                <p class="panel-copy">Menampilkan foto untuk <strong><?= html_escape($selectedProperty . ' - ' . $selectedType); ?></strong>.</p>
+                <p class="panel-copy">Menampilkan foto untuk <strong><?= html_escape($selectedProperty . ' - ' . $selectedType); ?></strong>. Pilih foto utama untuk sampul kartu kamar di landing dan foto pertama pada galeri detail.</p>
                 <?php if ((int) $category_counts['all'] > 0): ?>
                     <?php $activeCategory = isset($selected_category) ? $selected_category : 'all'; ?>
                     <div class="photo-category-tabs" data-photo-category-tabs>
@@ -144,8 +201,17 @@
                                 </button>
                                 <div>
                                     <span><?= html_escape($photo['category']); ?></span>
+                                    <?php if (! empty($photo['is_cover'])): ?><span class="badge photo-cover-status" data-photo-cover-current>Foto utama</span><?php endif; ?>
                                     <strong><?= html_escape($photo['filename']); ?></strong>
                                     <p><?= number_format((int) ceil($photo['size'] / 1024), 0, ',', '.'); ?> KB</p>
+                                    <?php if (empty($photo['is_cover'])): ?>
+                                        <form method="post" action="<?= base_url('photos/set-cover'); ?>" class="photo-cover-form">
+                                            <input type="hidden" name="property" value="<?= html_escape($selectedProperty); ?>">
+                                            <input type="hidden" name="type" value="<?= html_escape($selectedType); ?>">
+                                            <input type="hidden" name="file" value="<?= html_escape($photo['filename']); ?>">
+                                            <button type="submit" class="table-action photo-cover-submit" aria-label="<?= html_escape('Jadikan ' . $photo['filename'] . ' foto utama untuk ' . $selectedProperty . ' - ' . $selectedType); ?>">Jadikan foto utama</button>
+                                        </form>
+                                    <?php endif; ?>
                                     <button type="button" class="table-action danger" data-delete-url="<?= html_escape($photo['delete_url']); ?>" data-delete-label="<?= html_escape($photo['filename']); ?>">Hapus</button>
                                 </div>
                             </article>
@@ -293,5 +359,6 @@
     </div>
 
     <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/landing-photo-manager.js?v=20261021-1'); ?>" defer></script>
 </body>
 </html>

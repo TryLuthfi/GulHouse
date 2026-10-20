@@ -26,6 +26,7 @@ class Home extends CI_Controller
             'nearby_places' => $this->Landing_model->get_nearby_places(),
             'hero_slides' => $this->get_slider_images(),
             'preview_photos' => $this->Landing_model->get_preview_photos(4),
+            'daily_living_photo' => $this->Landing_model->get_daily_living_photo(),
         );
 
         $this->load->view('landing_home', $data);

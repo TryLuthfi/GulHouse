@@ -22,8 +22,8 @@ foreach(array('2026-02-30','2100-02-29','2030-1-01',$today.'T10:00:00',(new Date
 foreach(array(''=> 'optional empty',$today=>'WIB today',(new DateTimeImmutable('tomorrow',new DateTimeZone('Asia/Jakarta')))->format('Y-m-d')=>'future') as $date=>$label){$p=$valid;$p['fullname'].=' '.$label;$p['move_in_plan']=$date;valcheck($model->save_booking_request($p)&&$db->where('fullname',$p['fullname'])->get('gh_booking_requests')->row_array()['move_in_plan']===$date,'estimate date accepted: '.$label);}
 $cityMethod=new ReflectionMethod($model,'public_property_city');$cityMethod->setAccessible(TRUE);
 valcheck($cityMethod->invoke($model,'GH 1','Actual City','Kota Other')==='Actual City','actual property city takes priority');
-valcheck($cityMethod->invoke($model,'GH 3','','Jl. Synthetic, Kota Balikpapan, Kalimantan Timur 76114')==='Balikpapan','city extracted only from explicit city token in address');
-valcheck($cityMethod->invoke($model,'GH 2','','')==='Jakarta Barat'&&$cityMethod->invoke($model,'APT','','')==='','verified existing map fallback and unknown city preserved');
+valcheck($cityMethod->invoke($model,'GH 3',' Balikpapan ','Jl. Synthetic')==='Balikpapan','city comes from editable property master');
+valcheck($cityMethod->invoke($model,'GH 2','','Kota Jakarta Barat')===''&&$cityMethod->invoke($model,'APT','','')==='','empty city does not infer location or use hardcoded fallback');
 $cards=$model->get_all_public_rooms();$properties=array();foreach($db->get('gh_properties')->result_array() as $property)$properties[$property['code']]=$property;
 $locations=TRUE;foreach($cards as $card)$locations=$locations&&array_key_exists('city',$card)&&array_key_exists('property_address',$card)&&$card['property_address']===trim((string)($properties[$card['code']]['address']??''));
 valcheck($locations,'public room cards expose city and unchanged actual property address');

@@ -1,6 +1,8 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 require_once APPPATH.'libraries/Mobile_command_bridge.php';
+require_once APPPATH.'libraries/Gallery_cover.php';
+require_once APPPATH.'libraries/Landing_photos.php';
 
 class Manage extends CI_Controller
 {
@@ -37,9 +39,19 @@ class Manage extends CI_Controller
             'name' => trim((string) $this->input->post('name', TRUE)),
             'property_type' => trim((string) $this->input->post('property_type', TRUE)),
             'address' => trim((string) $this->input->post('address', TRUE)),
+            'city' => trim((string) $this->input->post('city', TRUE)),
             'is_active' => $this->input->post('is_active') ? 1 : 0,
         );
 
+        // Older mobile clients do not send city; retain their current master value.
+        if ($this->input->post('city') === NULL) {
+            $existing = $payload['id'] > 0 ? $this->Master_model->get_property($payload['id']) : array();
+            $payload['city'] = (string) ($existing['city'] ?? '');
+        }
+
+        if (mb_strlen($payload['city']) > 120) {
+            $this->master_error('properties', 'Kota maksimal 120 karakter.'); return;
+        }
         if (! in_array($payload['property_type'], array('house', 'apartment', 'other'), TRUE)) {
             $this->master_error('properties', 'Jenis properti tidak valid. Pilih House, Apartment, atau Other.'); return;
         }
@@ -215,7 +227,14 @@ class Manage extends CI_Controller
             $categoryCounts[$label]++;
         }
 
+        $landingChoices=array();
+        foreach(Gulhouse_landing_photos::catalog($this->uploads_path('')) as $choice) {
+            $choice['src']=base_url('photos/view?'.http_build_query(array('scope'=>'room','property'=>$choice['property'],'type'=>$choice['type'],'file'=>$choice['file'])));
+            $landingChoices[]=$choice;
+        }
         $this->load->view('manage/photos', array(
+            'landing_photo_choices'=>$landingChoices,
+            'landing_photo_selection'=>Gulhouse_landing_photos::read($this->uploads_path('')),
             'title' => 'Foto | GUL HOUSE',
             'admin_name' => $this->session->userdata('gh_admin_name'),
             'properties' => $properties,
@@ -230,6 +249,13 @@ class Manage extends CI_Controller
             'categories' => $categories,
             'category_counts' => $categoryCounts,
         ));
+    }
+
+    public function save_landing_photos()
+    {
+        $ok=Gulhouse_landing_photos::save($this->uploads_path(''),$this->input->post('preview'),$this->input->post('daily'));
+        $this->session->set_flashdata($ok?'success':'error',$ok?'Foto Landing tersimpan.':'Pilih empat foto Preview yang berbeda dan satu foto Daily living dari galeri yang tersedia.');
+        gh_mobile_redirect('photos','location',303);
     }
 
     public function upload_slider_photos()
@@ -294,6 +320,36 @@ class Manage extends CI_Controller
 
         $this->session->set_flashdata('success', $message);
         gh_mobile_redirect($lastProperty && $lastType ? 'photos?property=' . rawurlencode($lastProperty) . '&type=' . rawurlencode($lastType) : 'photos', 'location', 303);
+    }
+
+    public function set_photo_cover()
+    {
+        $property = $this->input->post('property', TRUE);
+        $type = $this->input->post('type', TRUE);
+        $file = $this->input->post('file', TRUE);
+        if (! is_string($property) || ! is_string($type) || ! is_string($file)) {
+            show_error('Pilihan foto tidak valid.', 400); return;
+        }
+        $property = $this->resolve_photo_value(trim($property), $this->Master_model->get_active_properties(), 'code');
+        $type = $this->resolve_photo_value(trim($type), $this->Master_model->get_active_room_types(), 'name');
+        $catalog = $this->Master_model->get_rooms_for_payment_filters();
+        $validPair = FALSE;
+        foreach ($catalog as $room) {
+            if ($room['property_code'] === $property && $room['type_name'] === $type) { $validPair = TRUE; break; }
+        }
+        if ($property === '' || $type === '' || ! $validPair) {
+            show_error('Gedung dan tipe kamar tidak valid.', 400); return;
+        }
+        $directory = $this->uploads_path($this->folder_key($property) . '/' . $this->folder_key($type));
+        $root = realpath($this->uploads_path(''));
+        $resolved = realpath($directory);
+        if (! $root || ! $resolved || strpos($resolved, $root . DIRECTORY_SEPARATOR) !== 0
+            || is_link($directory) || is_link(dirname($directory))) {
+            show_error('Galeri foto tidak valid.', 400); return;
+        }
+        $ok = Gulhouse_gallery_cover::save($directory, $file);
+        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Foto utama diperbarui untuk kartu landing dan galeri kamar.' : 'Foto utama belum tersimpan. Pastikan foto masih tersedia pada galeri yang dipilih.');
+        gh_mobile_redirect('photos?property=' . rawurlencode($property) . '&type=' . rawurlencode($type), 'location', 303);
     }
 
     public function delete_photo()
@@ -588,6 +644,7 @@ class Manage extends CI_Controller
             return $photos;
         }
 
+        $cover = $scope === 'room' ? Gulhouse_gallery_cover::selected($directory) : '';
         foreach (new DirectoryIterator($directory) as $file) {
             if (! $file->isFile() || ! $this->is_allowed_image($file->getFilename())) {
                 continue;
@@ -596,6 +653,7 @@ class Manage extends CI_Controller
             $filename = $file->getFilename();
             $photos[] = array(
                 'filename' => $filename,
+                'is_cover' => $scope === 'room' && $filename === $cover,
                 'size' => $file->getSize(),
                 'updated_at' => date('d M Y H:i', $file->getMTime()),
                 'category' => $scope === 'slider' ? 'Slider' : $this->category_from_filename($filename),

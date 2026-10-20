@@ -67,6 +67,7 @@ class Master_model extends CI_Model
             'name' => $payload['name'],
             'property_type' => in_array($payload['property_type'], array('house', 'apartment', 'other'), TRUE) ? $payload['property_type'] : 'house',
             'address' => $payload['address'] !== '' ? $payload['address'] : null,
+            'city' => trim((string) ($payload['city'] ?? '')) ?: null,
             'is_active' => (int) $payload['is_active'],
         );
 
@@ -721,6 +722,7 @@ class Master_model extends CI_Model
             $this->db->group_start()
                 ->like('code', $q)
                 ->or_like('name', $q)
+                ->or_like('city', $q)
                 ->or_like('address', $q)
                 ->group_end();
         }
