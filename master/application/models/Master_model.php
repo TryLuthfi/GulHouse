@@ -1,8 +1,12 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
+require_once APPPATH.'libraries/Region_location.php';
 
 class Master_model extends CI_Model
 {
+    private $location_error = '';
+    public function get_location_error(){return $this->location_error;}
+    public function get_region_catalog(){return Gulhouse_region_location::catalog($this->db);}
     private $payment_error = '';
     public function get_payment_error(){return $this->payment_error;}
     public function get_payment_quotes(array $billIds)
@@ -58,6 +62,7 @@ class Master_model extends CI_Model
 
     public function save_property(array $payload)
     {
+        $this->location_error='';
         if ($payload['code'] === '' || $payload['name'] === '') {
             return FALSE;
         }
@@ -66,10 +71,18 @@ class Master_model extends CI_Model
             'code' => $payload['code'],
             'name' => $payload['name'],
             'property_type' => in_array($payload['property_type'], array('house', 'apartment', 'other'), TRUE) ? $payload['property_type'] : 'house',
-            'address' => $payload['address'] !== '' ? $payload['address'] : null,
+            'address' => ($payload['address'] ?? '') !== '' ? $payload['address'] : null,
             'city' => trim((string) ($payload['city'] ?? '')) ?: null,
             'is_active' => (int) $payload['is_active'],
         );
+
+        $existing=$payload['id']>0 ? ($this->get_property($payload['id'])?:array()) : array();
+        if (!array_key_exists('city',$payload)) $data['city']=$existing['city']??null;
+        if (!array_key_exists('address',$payload)) $data['address']=$existing['address']??null;
+        try {
+            if ($data['property_type']!=='apartment') $data=array_merge($data,Gulhouse_region_location::resolve($this->db,$payload,$existing,'city'));
+            else { $data['city']=$existing['city']??null; $data['address']=$existing['address']??null; }
+        } catch (InvalidArgumentException $e) { $this->location_error=$e->getMessage();return FALSE; }
 
         if ($payload['id'] > 0) {
             return $this->db->where('id', $payload['id'])->update('gh_properties', $data);
@@ -178,6 +191,7 @@ class Master_model extends CI_Model
 
     public function save_room(array $payload)
     {
+        $this->location_error='';
         if ($payload['property_id'] <= 0 || $payload['room_type_id'] <= 0 || $payload['room_code'] === '' || ($payload['deposit'] !== null && $payload['deposit'] < 0) || ($payload['monthly_price'] !== null && $payload['monthly_price'] < 0)) {
             return FALSE;
         }
@@ -199,6 +213,18 @@ class Master_model extends CI_Model
         if ($data['status'] === 'mess') {
             $data['is_public'] = 0;
         }
+
+        foreach (array('unit_city','unit_address') as $field) {
+            if ($this->db->field_exists($field,'gh_rooms') && array_key_exists($field,$payload)) $data[$field] = trim((string)$payload[$field]) !== '' ? trim((string)$payload[$field]) : null;
+        }
+
+        $property=$this->get_property((int)$payload['property_id']);
+        try {
+            if ($property && $property['property_type']==='apartment') {
+                $existing=$payload['id']>0 ? ($this->get_room($payload['id'])?:array()) : array();
+                $data=array_merge($data,Gulhouse_region_location::resolve($this->db,$payload,$existing,'unit_city'));
+            } else { unset($data['unit_city'],$data['unit_address']); }
+        } catch (InvalidArgumentException $e) { $this->location_error=$e->getMessage();return FALSE; }
 
         if ($payload['id'] > 0) {
             return $this->db->where('id', $payload['id'])->update('gh_rooms', $data);
@@ -780,6 +806,8 @@ class Master_model extends CI_Model
                 ->like('r.room_code', $q)
                 ->or_like('r.room_name', $q)
                 ->or_like('r.room_label', $q)
+                ->or_like('r.unit_city', $q)
+                ->or_like('r.unit_address', $q)
                 ->or_like('p.code', $q)
                 ->or_like('rt.name', $q)
                 ->group_end();

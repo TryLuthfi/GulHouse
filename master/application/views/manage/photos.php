@@ -37,7 +37,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261020-admin-ui-1'); ?>">
-<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script><link rel="stylesheet" href="<?= base_url('assets/master/css/photos-cover.css?v=20261020-1'); ?>"><link rel="stylesheet" href="<?= base_url('assets/master/css/landing-photo-manager.css?v=20261021-1'); ?>"></head>
+<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script><link rel="stylesheet" href="<?= base_url('assets/master/css/photos-cover.css?v=20261020-1'); ?>"><link rel="stylesheet" href="<?= base_url('assets/master/css/landing-photo-manager.css?v=20261021-1'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/master/css/photo-focus.css?v=20261021-1'); ?>">
+</head>
 <body class="gh-admin-ui">
     <?php $this->load->view('partials/sidebar', array('active_menu' => 'photos')); ?>
 
@@ -197,7 +199,7 @@
                                     data-photo-property="<?= html_escape($selectedProperty); ?>"
                                     data-photo-type="<?= html_escape($selectedType); ?>"
                                     data-photo-file="<?= html_escape($photo['filename']); ?>">
-                                    <img src="<?= html_escape($photo['url']); ?>" alt="<?= html_escape($photo['filename']); ?>" loading="lazy">
+                                    <img src="<?= html_escape($photo['url']); ?>" alt="<?= html_escape($photo['filename']); ?>" loading="lazy" data-photo-focus-preview style="object-position: <?= (int) (isset($photo['focus_x']) ? $photo['focus_x'] : 50); ?>% <?= (int) (isset($photo['focus_y']) ? $photo['focus_y'] : 70); ?>%;">
                                 </button>
                                 <div>
                                     <span><?= html_escape($photo['category']); ?></span>
@@ -212,6 +214,22 @@
                                             <button type="submit" class="table-action photo-cover-submit" aria-label="<?= html_escape('Jadikan ' . $photo['filename'] . ' foto utama untuk ' . $selectedProperty . ' - ' . $selectedType); ?>">Jadikan foto utama</button>
                                         </form>
                                     <?php endif; ?>
+                                    <details class="photo-focus-editor">
+                                        <summary>Atur posisi fokus</summary>
+                                        <form method="post" action="<?= base_url('photos/set-focus'); ?>" class="photo-focus-form" data-photo-focus-form>
+                                            <input type="hidden" name="property" value="<?= html_escape($selectedProperty); ?>">
+                                            <input type="hidden" name="type" value="<?= html_escape($selectedType); ?>">
+                                            <input type="hidden" name="file" value="<?= html_escape($photo['filename']); ?>">
+                                            <p>Pratinjau kartu 4:3 terlihat pada foto di atas. Geser untuk memilih bagian foto yang ditampilkan.</p>
+                                            <label>Horizontal <output data-focus-output="x"><?= (int) (isset($photo['focus_x']) ? $photo['focus_x'] : 50); ?>%</output>
+                                                <input type="range" name="focus_x" min="0" max="100" step="1" value="<?= (int) (isset($photo['focus_x']) ? $photo['focus_x'] : 50); ?>" data-focus-axis="x">
+                                            </label>
+                                            <label>Vertikal <output data-focus-output="y"><?= (int) (isset($photo['focus_y']) ? $photo['focus_y'] : 70); ?>%</output>
+                                                <input type="range" name="focus_y" min="0" max="100" step="1" value="<?= (int) (isset($photo['focus_y']) ? $photo['focus_y'] : 70); ?>" data-focus-axis="y">
+                                            </label>
+                                            <button type="submit" class="table-action photo-focus-submit">Simpan posisi fokus</button>
+                                        </form>
+                                    </details>
                                     <button type="button" class="table-action danger" data-delete-url="<?= html_escape($photo['delete_url']); ?>" data-delete-label="<?= html_escape($photo['filename']); ?>">Hapus</button>
                                 </div>
                             </article>
@@ -360,5 +378,6 @@
 
     <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
     <script src="<?= base_url('assets/master/js/landing-photo-manager.js?v=20261021-1'); ?>" defer></script>
+    <script src="<?= base_url('assets/master/js/photo-focus.js?v=20261021-1'); ?>" defer></script>
 </body>
 </html>

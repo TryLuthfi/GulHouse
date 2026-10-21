@@ -2,6 +2,7 @@
 defined('BASEPATH') OR exit('No direct script access allowed');
 require_once APPPATH.'libraries/Mobile_command_bridge.php';
 require_once APPPATH.'libraries/Gallery_cover.php';
+require_once APPPATH.'libraries/Gallery_focus.php';
 require_once APPPATH.'libraries/Landing_photos.php';
 
 class Manage extends CI_Controller
@@ -24,6 +25,7 @@ class Manage extends CI_Controller
 
         $this->load->view('manage/properties', array(
             'title' => 'Properti | GUL HOUSE',
+            'region_data' => $this->Master_model->get_region_catalog(),
             'admin_name' => $this->session->userdata('gh_admin_name'),
             'rows' => $this->Master_model->get_properties($filters),
             'filters' => $filters,
@@ -33,6 +35,9 @@ class Manage extends CI_Controller
 
     public function save_property()
     {
+        foreach (array('city','address') as $field) {
+            if ($this->input->post($field)!==NULL && !is_string($this->input->post($field))) { $this->master_error('properties','Alamat atau kota tidak valid.');return; }
+        }
         $payload = array(
             'id' => (int) $this->input->post('id'),
             'code' => strtoupper(trim((string) $this->input->post('code', TRUE))),
@@ -48,6 +53,11 @@ class Manage extends CI_Controller
             $existing = $payload['id'] > 0 ? $this->Master_model->get_property($payload['id']) : array();
             $payload['city'] = (string) ($existing['city'] ?? '');
         }
+        if ($this->input->post('address') === NULL) {
+            $existing = $payload['id'] > 0 ? $this->Master_model->get_property($payload['id']) : array();
+            $payload['address']=(string)($existing['address']??'');
+        }
+        foreach (Gulhouse_region_location::fields() as $field) if ($this->input->post($field)!==NULL) $payload[$field]=$this->input->post($field);
 
         if (mb_strlen($payload['city']) > 120) {
             $this->master_error('properties', 'Kota maksimal 120 karakter.'); return;
@@ -63,7 +73,7 @@ class Manage extends CI_Controller
             $this->master_error('properties', 'Arsipkan kamar terlebih dahulu sebelum menonaktifkan properti.'); return;
         }
         $ok = $this->Master_model->save_property($payload);
-        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Properti tersimpan.' : 'Properti belum tersimpan. Cek kode dan nama.');
+        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Properti tersimpan.' : ($this->Master_model->get_location_error() ?: 'Properti belum tersimpan. Cek kode dan nama.'));
         gh_mobile_redirect('properties', 'location', 303);
     }
 
@@ -140,6 +150,7 @@ class Manage extends CI_Controller
 
         $this->load->view('manage/rooms', array(
             'title' => 'Kamar | GUL HOUSE',
+            'region_data' => $this->Master_model->get_region_catalog(),
             'admin_name' => $this->session->userdata('gh_admin_name'),
             'rows' => $this->Master_model->get_rooms($filters),
             'room_catalog' => $this->Master_model->get_rooms(),
@@ -152,6 +163,10 @@ class Manage extends CI_Controller
 
     public function save_room()
     {
+        foreach (array('unit_city','unit_address') as $locationField) {
+            $value = $this->input->post($locationField, TRUE);
+            if ($value !== NULL && !is_string($value)) { $this->master_error('rooms','Lokasi unit tidak valid.'); return; }
+        }
         $payload = array(
             'id' => (int) $this->input->post('id'),
             'property_id' => (int) $this->input->post('property_id'),
@@ -159,6 +174,8 @@ class Manage extends CI_Controller
             'room_code' => strtoupper(trim((string) $this->input->post('room_code', TRUE))),
             'room_name' => trim((string) $this->input->post('room_name', TRUE)),
             'room_label' => trim((string) $this->input->post('room_label', TRUE)),
+            'unit_city' => trim((string) $this->input->post('unit_city', TRUE)),
+            'unit_address' => trim((string) $this->input->post('unit_address', TRUE)),
             'floor_no' => $this->nullable_int($this->input->post('floor_no')),
             'deposit' => $this->nullable_money($this->input->post('deposit')),
             'monthly_price' => $this->nullable_money($this->input->post('monthly_price')),
@@ -166,6 +183,14 @@ class Manage extends CI_Controller
             'is_public' => $this->input->post('is_public') ? 1 : 0,
         );
 
+        // Existing mobile clients omit location fields; retain values already saved.
+        $currentLocation = $payload['id'] > 0 ? $this->Master_model->get_room($payload['id']) : array();
+        foreach (array('unit_city','unit_address') as $locationField) {
+            if ($this->input->post($locationField) === NULL) $payload[$locationField] = (string) ($currentLocation[$locationField] ?? '');
+        }
+        if (mb_strlen($payload['unit_city']) > 120 || mb_strlen($payload['unit_address']) > 2000) {
+            $this->master_error('rooms','Kota unit maksimal 120 karakter dan alamat unit maksimal 2.000 karakter.'); return;
+        }
         $property = $this->db->where('id', $payload['property_id'])->where('is_active', 1)->get('gh_properties')->row_array();
         $type = $this->db->where('id', $payload['room_type_id'])->where('is_active', 1)->get('gh_room_types')->row_array();
         if (! $property || ! $type || $payload['room_code'] === '' || strlen($payload['room_code']) > 30
@@ -180,8 +205,9 @@ class Manage extends CI_Controller
                 $this->master_error('rooms', 'Kamar memiliki masa tinggal berjalan. Ubah status melalui alur kontrak/check-out terlebih dahulu.'); return;
             }
         }
+        foreach (Gulhouse_region_location::fields() as $field) if ($this->input->post($field)!==NULL) $payload[$field]=$this->input->post($field);
         $ok = $this->Master_model->save_room($payload);
-        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Kamar tersimpan.' : 'Kamar belum tersimpan.');
+        $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Kamar tersimpan.' : ($this->Master_model->get_location_error() ?: 'Kamar belum tersimpan.'));
         gh_mobile_redirect('rooms', 'location', 303);
     }
 
@@ -350,6 +376,22 @@ class Manage extends CI_Controller
         $ok = Gulhouse_gallery_cover::save($directory, $file);
         $this->session->set_flashdata($ok ? 'success' : 'error', $ok ? 'Foto utama diperbarui untuk kartu landing dan galeri kamar.' : 'Foto utama belum tersimpan. Pastikan foto masih tersedia pada galeri yang dipilih.');
         gh_mobile_redirect('photos?property=' . rawurlencode($property) . '&type=' . rawurlencode($type), 'location', 303);
+    }
+
+    public function save_photo_focus()
+    {
+        $property=$this->input->post('property',TRUE);$type=$this->input->post('type',TRUE);$file=$this->input->post('file',TRUE);
+        if(!is_string($property)||!is_string($type)||!is_string($file)){show_error('Pilihan foto tidak valid.',400);return;}
+        $property=$this->resolve_photo_value(trim($property),$this->Master_model->get_active_properties(),'code');
+        $type=$this->resolve_photo_value(trim($type),$this->Master_model->get_active_room_types(),'name');
+        $valid=false;
+        foreach($this->Master_model->get_rooms_for_payment_filters() as $room)if($room['property_code']===$property&&$room['type_name']===$type){$valid=true;break;}
+        $directory=$this->uploads_path($this->folder_key($property).'/'.$this->folder_key($type));
+        $root=realpath($this->uploads_path(''));$resolved=realpath($directory);
+        if(!$valid||!$root||!$resolved||strpos($resolved,$root.DIRECTORY_SEPARATOR)!==0||is_link($directory)||is_link(dirname($directory))){show_error('Galeri foto tidak valid.',400);return;}
+        $ok=Gulhouse_gallery_focus::save($directory,$file,$this->input->post('focus_x'),$this->input->post('focus_y'));
+        $this->session->set_flashdata($ok?'success':'error',$ok?'Posisi fokus foto tersimpan.':'Posisi fokus belum tersimpan. Gunakan angka bulat 0–100 dan foto yang tersedia.');
+        gh_mobile_redirect('photos?property='.rawurlencode($property).'&type='.rawurlencode($type),'location',303);
     }
 
     public function delete_photo()
@@ -651,8 +693,11 @@ class Manage extends CI_Controller
             }
 
             $filename = $file->getFilename();
+            $focus = $scope === 'room' ? Gulhouse_gallery_focus::get($directory,$filename) : array('x'=>50,'y'=>70);
             $photos[] = array(
                 'filename' => $filename,
+                'focus_x' => $focus['x'],
+                'focus_y' => $focus['y'],
                 'is_cover' => $scope === 'room' && $filename === $cover,
                 'size' => $file->getSize(),
                 'updated_at' => date('d M Y H:i', $file->getMTime()),

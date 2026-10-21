@@ -1,0 +1,14 @@
+<?php
+require dirname(__DIR__).'/scripts/booking-retention-bootstrap.php';list($unused,$admin)=booking_retention_cli('gulhouse_db');
+$schema='gulhouse_test_ciko_regionrestore_'.date('Ymd_His').'_'.random_int(1000,9999);if(!preg_match('/^gulhouse_test_ciko_regionrestore_[0-9_]+$/D',$schema))throw new RuntimeException('Fixture guard');
+$audit=trim(file_get_contents($root.'/.e2e/regions-20261021/active.txt'));$allowed=realpath($root.'/.e2e/regions-20261021');$resolved=realpath($audit);if(!$resolved||strpos(str_replace('\\','/',$resolved),str_replace('\\','/',$allowed).'/')!==0)throw new RuntimeException('Backup directory guard');
+$sql=file_get_contents($resolved.'/database-before.sql');if(preg_match('/^\s*(?:USE\s|CREATE\s+DATABASE|DROP\s+DATABASE|DELIMITER\s)/im',$sql))throw new RuntimeException('Dump target is not confined to selected owned schema');
+$baseline=json_decode(file_get_contents($root.'/.e2e/regions-20261021/ciko-before.json'),true);$backupJson=json_decode(file_get_contents($resolved.'/database-before.json'),true);$checks=array();$ck=function($n,$ok)use(&$checks){$checks[]=array('name'=>$n,'status'=>$ok?'PASS':'FAIL');if(!$ok)throw new RuntimeException('FAIL '.$n);};
+$admin->query('CREATE DATABASE `'.$schema.'` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci');list($unused,$db)=booking_retention_cli($schema);
+try{
+ $connection=$db->conn_id;if(!$connection->multi_query($sql))throw new RuntimeException('SQL restore failed');do{if($res=$connection->store_result())$res->free();if(!$connection->more_results())break;if(!$connection->next_result())throw new RuntimeException('SQL restore statement failed');}while(true);if($connection->errno)throw new RuntimeException('SQL restore query error');
+ $actual=$db->query('SHOW TABLES')->result_array();$ck('Full SQL restore recreates all original tables',count($actual)===count($baseline['tables']));
+ foreach($baseline['tables'] as $t=>$old){$rows=$db->get($t)->result_array();$enc=array_map('json_encode',$rows);sort($enc,SORT_STRING);$backupEnc=array_map('json_encode',$backupJson[$t]);sort($backupEnc,SORT_STRING);$ck('Restored table matches backup JSON and independent baseline: '.$t,count($rows)===$old['rows']&&hash('sha256',json_encode($enc))===$old['sha256']&&$enc===$backupEnc);}
+ $result=array('passed'=>count($checks),'failed'=>0,'checks'=>$checks,'real_database_writes'=>0,'owned_restore_fixture'=>true);
+}catch(Throwable $e){$result=array('passed'=>count(array_filter($checks,function($x){return $x['status']==='PASS';})),'failed'=>1,'error'=>$e->getMessage(),'schema'=>$schema,'checks'=>$checks);}
+file_put_contents($root.'/.e2e/regions-20261021/ciko-restore-results.json',json_encode($result,JSON_PRETTY_PRINT));if(!$result['failed'])$admin->query('DROP DATABASE `'.$schema.'`');echo json_encode($result,JSON_PRETTY_PRINT);exit($result['failed']?1:0);

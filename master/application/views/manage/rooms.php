@@ -7,6 +7,12 @@
     $availableRooms = 0;
     $occupiedRooms = 0;
     $publicRooms = 0;
+    $apartmentPropertyIds = array();
+    foreach ($properties as $property) {
+        if (isset($property['property_type']) && $property['property_type'] === 'apartment') {
+            $apartmentPropertyIds[(int) $property['id']] = TRUE;
+        }
+    }
     foreach ($rows as $roomRow) {
         if ($roomRow['status'] === 'available') {
             $availableRooms++;
@@ -162,7 +168,12 @@
                             <tr>
                                 <td><strong><?= html_escape($row['property_code']); ?></strong></td>
                                 <td><?= html_escape($row['room_code']); ?></td>
-                                <td><?= html_escape($row['room_label']); ?></td>
+                                <td>
+                                    <?= html_escape($row['room_label']); ?>
+                                    <?php if (isset($apartmentPropertyIds[(int) $row['property_id']])): ?>
+                                        <br><small title="<?= html_escape((string) ($row['unit_address'] ?? '')); ?>"><?= html_escape(trim((string) ($row['unit_city'] ?? '')) !== '' ? $row['unit_city'] : 'Lokasi belum diatur'); ?></small>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?= html_escape($row['type_name']); ?></td>
                                 <td><?= $row['monthly_price'] ? 'Rp ' . number_format((int) $row['monthly_price'], 0, ',', '.') : '-'; ?></td>
                                 <td><span class="badge <?= html_escape($row['status']); ?>"><?= html_escape(ucfirst($row['status'])); ?></span></td>
@@ -184,7 +195,7 @@
     </main>
 
     <?php
-        $emptyRoom = array('id' => 0, 'property_id' => '', 'room_type_id' => '', 'room_code' => '', 'room_name' => '', 'room_label' => '', 'floor_no' => '', 'deposit' => '', 'monthly_price' => '', 'status' => 'available', 'is_public' => 1);
+        $emptyRoom = array('id' => 0, 'property_id' => '', 'room_type_id' => '', 'room_code' => '', 'room_name' => '', 'room_label' => '', 'floor_no' => '', 'unit_city' => '', 'unit_address' => '', 'deposit' => '', 'monthly_price' => '', 'status' => 'available', 'is_public' => 1);
         $roomModalRows = array_merge(array($emptyRoom), $rows);
     ?>
     <?php foreach ($roomModalRows as $modalRoom): ?>
@@ -201,7 +212,7 @@
                             <select name="property_id" required>
                                 <option value="">Pilih properti</option>
                                 <?php foreach ($properties as $property): ?>
-                                    <option value="<?= (int) $property['id']; ?>" <?= (int) $modalRoom['property_id'] === (int) $property['id'] ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
+                                    <option value="<?= (int) $property['id']; ?>" data-property-type="<?= html_escape($property['property_type']); ?>" <?= (int) $modalRoom['property_id'] === (int) $property['id'] ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </label>
@@ -229,6 +240,7 @@
                         <label>Label<input type="text" name="room_label" maxlength="150" value="<?= html_escape($modalRoom['room_label']); ?>" placeholder="Cappadocia 101"></label>
                         <label>Lantai<input type="number" name="floor_no" min="0" max="255" value="<?= html_escape((string) $modalRoom['floor_no']); ?>"></label>
                     </div>
+                    <?php $this->load->view('partials/location_fields', array('location_row' => $modalRoom, 'location_scope' => 'unit', 'region_data' => $region_data ?? array())); ?>
                     <div class="form-section">
                         <h3 class="form-section-title">Harga dan Deposit</h3>
                         <label>Deposit<input type="text" name="deposit" inputmode="numeric" value="<?= html_escape(gh_money_input($modalRoom['deposit'])); ?>" placeholder="Rp 1.000.000" data-money-input></label>
@@ -258,6 +270,8 @@
         </section>
     </div>
 
+    <script id="gh-region-data" type="application/json"><?= json_encode($region_data ?? array(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?></script>
+    <script src="<?= base_url('assets/master/js/region-location.js?v=20261021-1'); ?>"></script>
     <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
 </body>
 </html>

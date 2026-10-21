@@ -1,6 +1,8 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 require_once dirname(__DIR__, 3) . '/master/application/libraries/Gallery_cover.php';
+require_once dirname(__DIR__, 3) . '/master/application/libraries/Gallery_focus.php';
+require_once dirname(__DIR__, 3) . '/master/application/libraries/Apartment_buildings.php';
 require_once dirname(__DIR__, 3) . '/master/application/libraries/Landing_photos.php';
 
 class Landing_model extends CI_Model
@@ -275,6 +277,7 @@ class Landing_model extends CI_Model
                 ->select('SUM(CASE WHEN r.monthly_price IS NOT NULL AND r.status = "available" AND r.is_public = 1 THEN 1 ELSE 0 END) AS available_count', FALSE)
                 ->from('gh_properties p')
                 ->join('gh_rooms r', 'r.property_id = p.id', 'left')
+                ->where('p.is_active', 1)
                 ->group_by('p.id')
                 ->order_by('p.code', 'ASC')
                 ->get()
@@ -320,6 +323,17 @@ class Landing_model extends CI_Model
         foreach ($cards as $card) {
             if ($card['slug'] === $slug) {
                 return $this->normalize_public_room_type_detail($card);
+            }
+            if (($card['property_type'] ?? '') === 'apartment' && $card['code'] === 'APT'
+                && $slug === $this->create_public_room_slug('APT', $card['type_name'])) {
+                return $this->normalize_public_room_type_detail($card);
+            }
+            // Existing shared APT links continue to resolve after the building split.
+            foreach (Gulhouse_apartment_buildings::definitions() as $type => $definition) {
+                if (($card['property_type'] ?? '') === 'apartment' && $card['type_name'] === $type
+                    && $slug === $this->create_public_room_slug($definition['code'], $type)) {
+                    return $this->normalize_public_room_type_detail($card);
+                }
             }
         }
 
@@ -537,6 +551,17 @@ class Landing_model extends CI_Model
         });
 
         return $gallery;
+    }
+
+    private function with_photo_focus(array $cards)
+    {
+        foreach($cards as &$card) {
+            $directory=FCPATH.'../uploads/'.$this->folder_key($card['code']).'/'.$this->folder_key($card['type_name']);
+            $file=Gulhouse_gallery_cover::selected($directory);
+            $focus=Gulhouse_gallery_focus::get($directory,$file);
+            $card['image_focus_x']=$focus['x'];$card['image_focus_y']=$focus['y'];
+        }
+        unset($card);return $cards;
     }
 
     private function get_uploaded_room_cover($code, $type)
@@ -1032,15 +1057,21 @@ class Landing_model extends CI_Model
             );
         }
 
-        return $cards ? $cards : $this->fallback_public_room_type_cards();
+        return $this->with_photo_focus($cards ? $cards : $this->fallback_public_room_type_cards());
     }
 
     private function get_public_master_room_type_cards()
     {
-        $citySelect=$this->db->field_exists('city','gh_properties')?'MAX(p.city) AS city':'"" AS city';
-        $addressSelect=$this->db->field_exists('address','gh_properties')?'MAX(p.address) AS property_address':'"" AS property_address';
+        $unitCity=$this->db->field_exists('unit_city','gh_rooms')?'r.unit_city':'NULL';
+        $unitAddress=$this->db->field_exists('unit_address','gh_rooms')?'r.unit_address':'NULL';
+        $propertyCity=$this->db->field_exists('city','gh_properties')?'p.city':'NULL';
+        $propertyAddress=$this->db->field_exists('address','gh_properties')?'p.address':'NULL';
+        $citySelect='MAX(CASE WHEN p.property_type="apartment" THEN '.$unitCity.' ELSE '.$propertyCity.' END) AS city';
+        $addressSelect='MAX(CASE WHEN p.property_type="apartment" THEN '.$unitAddress.' ELSE '.$propertyAddress.' END) AS property_address';
         $rows = $this->db
             ->select('p.code AS property_code', FALSE)
+            ->select('MAX(p.name) AS property_name, MAX(p.property_type) AS property_type', FALSE)
+            ->select('MAX(r.id) AS unit_id, MAX(r.room_label) AS unit_label', FALSE)
             ->select($citySelect,FALSE)->select($addressSelect,FALSE)
             ->select('rt.name AS type_name', FALSE)
             ->select('SUM(CASE WHEN r.monthly_price IS NOT NULL AND r.status NOT IN ("inactive", "mess") THEN 1 ELSE 0 END) AS total_rooms', FALSE)
@@ -1051,7 +1082,9 @@ class Landing_model extends CI_Model
             ->from('gh_rooms r')
             ->join('gh_properties p', 'p.id = r.property_id', 'left')
             ->join('gh_room_types rt', 'rt.id = r.room_type_id', 'left')
+            ->where('p.is_active', 1)
             ->group_by('p.id, rt.id')
+            ->group_by('CASE WHEN p.property_type="apartment" THEN r.id ELSE 0 END', FALSE)
             ->having('total_rooms >', 0)
             ->order_by('p.code', 'ASC')
             ->order_by('FIELD(rt.name, "Standart", "Deluxe", "VIP")', '', FALSE)
@@ -1065,9 +1098,12 @@ class Landing_model extends CI_Model
                 'id' => $index + 1,
                 'city' => $this->public_property_city($row['property_code'],$row['city'],$row['property_address']),
                 'property_address' => trim((string)$row['property_address']),
+                'property_type' => $row['property_type'],
+                'property_name' => $row['property_name'],
                 'code' => $row['property_code'],
-                'name' => $row['property_code'] . ' - ' . $row['type_name'],
-                'slug' => $this->create_public_room_slug($row['property_code'], $row['type_name']),
+                'name' => $row['property_type'] === 'apartment' ? 'Apartemen ' . $row['type_name'] . ' · ' . $row['unit_label'] : $row['property_code'] . ' - ' . $row['type_name'],
+                'slug' => $this->create_public_room_slug($row['property_code'], $row['type_name']) . ($row['property_type'] === 'apartment' ? '-unit-' . (int)$row['unit_id'] : ''),
+                'unit_id' => $row['property_type'] === 'apartment' ? (int)$row['unit_id'] : null,
                 'price' => (int) $row['price'],
                 'max_price' => (int) $row['max_price'],
                 'status' => ((int) $row['available_count'] > 0) ? 'available' : 'full',
@@ -1079,7 +1115,7 @@ class Landing_model extends CI_Model
             );
         }
 
-        return $cards ? $cards : $this->fallback_public_room_type_cards();
+        return $this->with_photo_focus($cards ? $cards : $this->fallback_public_room_type_cards());
     }
 
     private function public_property_city($code,$city,$address)
@@ -1151,6 +1187,7 @@ class Landing_model extends CI_Model
 
         $card['type_description'] = $card['name'] . ' memiliki ' . $availabilityText . '. Harga tetap ditampilkan sebagai referensi dan dapat berbeda sesuai fasilitas atau kondisi kamar.';
         $card['public_description'] = 'Pilihan ' . $card['type_name'] . ' di ' . $card['code'] . ' untuk calon penghuni yang ingin survey kamar tanpa memilih nomor kamar terlebih dahulu.';
+        if (($card['property_type'] ?? '') === 'apartment') $card['public_description'] = 'Lihat kondisi dan fasilitas unit apartemen ini, lalu hubungi pengelola untuk menjadwalkan survey.';
         $card['facilities'] = array('Kasur', 'Lemari', 'Meja kerja', 'Kursi', 'Akses 24 jam');
 
         return $card;

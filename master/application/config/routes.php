@@ -28,6 +28,7 @@ $route['photos'] = 'manage/photos';
 $route['photos/upload-slider'] = 'manage/upload_slider_photos';
 $route['photos/upload-room'] = 'manage/upload_room_photos';
 $route['photos/set-cover'] = 'manage/set_photo_cover';
+$route['photos/set-focus'] = 'manage/save_photo_focus';
 $route['photos/save-landing'] = 'manage/save_landing_photos';
 $route['photos/delete'] = 'manage/delete_photo';
 $route['photos/rotate'] = 'manage/rotate_photo';

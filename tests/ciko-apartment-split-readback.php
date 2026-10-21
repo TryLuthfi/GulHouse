@@ -1,0 +1,12 @@
+<?php
+require dirname(__DIR__).'/scripts/booking-retention-bootstrap.php';list($unused,$db)=booking_retention_cli('gulhouse_db');
+$dir=$root.'/.e2e/apartment-split-20261021';$before=json_decode(file_get_contents($dir.'/ciko-before.json'),true);$checks=array();
+$ck=function($n,$ok)use(&$checks){$checks[]=array('name'=>$n,'status'=>$ok?'PASS':'FAIL');};
+foreach($before['tables'] as $table=>$expected){if(in_array($table,array('gh_rooms','gh_properties'),true))continue;$rows=$db->get($table)->result_array();$encoded=array_map('json_encode',$rows);sort($encoded,SORT_STRING);$ck('Unchanged rows and hash: '.$table,count($rows)===$expected['rows']&&hash('sha256',json_encode($encoded))===$expected['sha256']);}
+$props=$db->where('property_type','apartment')->get('gh_properties')->result_array();$apt=$db->where('id',4)->get('gh_properties')->row_array();$ck('Legacy APT retained inactive and no rooms',(int)$apt['is_active']===0&&$db->where('property_id',4)->count_all_results('gh_rooms')===0);
+$mapping=array('The Nest'=>'APT THE NEST','Mejestic'=>'APT MEJESTIC','PIK 2'=>'APT PIK 2','Taman Anggrek'=>'APT TAMAN ANGGREK');$pmap=array();foreach($props as $p)$pmap[$p['id']]=$p;
+foreach($before['apartments'] as $old){$new=$db->select('r.id,r.property_id,r.room_type_id,r.room_code,r.room_label,r.status,r.is_public,r.monthly_price,r.deposit,r.created_at,r.updated_at,rt.name AS type_name')->from('gh_rooms r')->join('gh_room_types rt','rt.id=r.room_type_id')->where('r.id',$old['id'])->get()->row_array();$pid=$new['property_id'];$n=$new;$o=$old;unset($n['property_id'],$o['property_id']);$ck('Room '.$old['id'].' all non-property fields and timestamps preserved',$n===$o);$ck('Room '.$old['id'].' assigned to correct building',isset($pmap[$pid])&&$pmap[$pid]['code']===$mapping[$old['type_name']]);}
+foreach($mapping as $type=>$code){$p=$db->where('code',$code)->get('gh_properties')->row_array();$ck($code.' active apartment with independent blank city/address',$p&&(int)$p['is_active']===1&&$p['property_type']==='apartment'&&$p['city']===null&&$p['address']===null);}
+$ck('Total room count unchanged',$db->count_all('gh_rooms')===$before['tables']['gh_rooms']['rows']);
+$result=array('passed'=>count(array_filter($checks,function($c){return $c['status']==='PASS';})),'failed'=>count(array_filter($checks,function($c){return $c['status']==='FAIL';})),'checks'=>$checks,'database_writes'=>0);
+file_put_contents($dir.'/ciko-readback-results.json',json_encode($result,JSON_PRETTY_PRINT));echo json_encode($result,JSON_PRETTY_PRINT);exit($result['failed']?1:0);

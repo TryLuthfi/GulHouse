@@ -1,0 +1,13 @@
+/* Scoped editor: the preview uses the same crop and ratio as public room cards. */
+.gh-admin-ui .photo-focus-editor { min-width: 0; border: 1px solid #dbe3ee; border-radius: 10px; background: #f8fafc; }
+.gh-admin-ui .photo-focus-editor summary { padding: 12px; cursor: pointer; font-size: 13px; font-weight: 600; color: #1d4ed8; }
+.gh-admin-ui .photo-focus-editor summary:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.gh-admin-ui .photo-focus-form { display: grid; gap: 14px; padding: 0 12px 12px; margin: 0; min-width: 0; }
+.gh-admin-ui .photo-focus-form p { font-size: 12px; line-height: 1.5; }
+.gh-admin-ui .photo-focus-form label { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 13px; font-weight: 600; }
+.gh-admin-ui .photo-focus-form output { color: #475569; font-variant-numeric: tabular-nums; }
+.gh-admin-ui .photo-focus-form input[type="range"] { grid-column: 1 / -1; width: 100%; min-height: 32px; padding: 0; accent-color: #2563eb; cursor: pointer; }
+.gh-admin-ui .photo-focus-form .photo-focus-submit { width: 100%; color: #fff; background: #2563eb; border-color: #2563eb; }
+.gh-admin-ui .photo-focus-form .photo-focus-submit:hover { color: #fff; background: #1d4ed8; }
+.gh-admin-ui .photo-card [data-photo-focus-preview] { aspect-ratio: 4 / 3; height: auto; object-fit: cover; transform: none; filter: none; transition: none; }
+.gh-admin-ui .photo-card .photo-preview-trigger:hover [data-photo-focus-preview] { transform: none; filter: none; }

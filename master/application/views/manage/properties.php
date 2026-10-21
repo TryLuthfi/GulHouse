@@ -144,11 +144,7 @@
                     </label>
                     <label class="check-row"><input type="checkbox" name="is_active" value="1" checked> Aktif</label>
                 </div>
-                <div class="form-section">
-                    <h3 class="form-section-title">Lokasi</h3>
-                    <label class="full">Kota<input type="text" name="city" maxlength="120" autocomplete="address-level2" placeholder="Contoh: Jakarta Barat atau Balikpapan"></label>
-                    <label class="full">Alamat<textarea name="address" rows="4" placeholder="Alamat properti"></textarea></label>
-                </div>
+                <?php $this->load->view('partials/location_fields', array('location_row' => array(), 'location_scope' => 'property', 'region_data' => $region_data ?? array())); ?>
                 <div class="form-actions"><button type="submit">Simpan Properti</button></div>
             </form>
         </section>
@@ -174,11 +170,7 @@
                         </label>
                         <label class="check-row"><input type="checkbox" name="is_active" value="1" <?= (int) $row['is_active'] === 1 ? 'checked' : ''; ?>> Aktif</label>
                     </div>
-                    <div class="form-section">
-                        <h3 class="form-section-title">Lokasi</h3>
-                        <label class="full">Kota<input type="text" name="city" maxlength="120" autocomplete="address-level2" value="<?= html_escape(isset($row['city']) ? (string) $row['city'] : ''); ?>" placeholder="Contoh: Jakarta Barat atau Balikpapan"></label>
-                        <label class="full">Alamat<textarea name="address" rows="4"><?= html_escape((string) $row['address']); ?></textarea></label>
-                    </div>
+                    <?php $this->load->view('partials/location_fields', array('location_row' => $row, 'location_scope' => 'property', 'region_data' => $region_data ?? array())); ?>
                     <div class="form-actions"><button type="submit">Simpan Perubahan</button></div>
                 </form>
             </section>
@@ -203,6 +195,8 @@
         </section>
     </div>
 
+    <script id="gh-region-data" type="application/json"><?= json_encode($region_data ?? array(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?></script>
+    <script src="<?= base_url('assets/master/js/region-location.js?v=20261021-1'); ?>"></script>
     <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
 </body>
 </html>

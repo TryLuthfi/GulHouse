@@ -1129,26 +1129,28 @@ a {
     border-radius: 8px;
     box-shadow: var(--shadow);
     scroll-snap-align: start;
-    transition: transform .28s ease, box-shadow .28s ease, border-color .28s ease;
+    transition: box-shadow .28s ease, border-color .28s ease;
 }
 
 .room-card:hover {
-    transform: translateY(-8px) scale(1.01);
+    transform: none;
     border-color: rgba(201, 151, 76, .58);
     box-shadow: 0 24px 64px rgba(21, 32, 28, .2);
 }
 
 .room-photo {
-    min-height: 250px;
-    background-size: cover;
-    background-position: center var(--card-parallax-y, 0px);
-    transform: scale(1.02);
-    transition: transform .5s ease, filter .5s ease;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: #e8ede8;
 }
 
-.room-card:hover .room-photo {
-    transform: scale(1.08);
-    filter: saturate(1.08) contrast(1.04);
+.room-photo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: none;
 }
 
 .room-photo-empty {
@@ -1231,14 +1233,14 @@ a {
 
 .preview-mosaic {
     display: grid;
-    grid-template-columns: 1.08fr .92fr;
-    grid-auto-rows: 190px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
     gap: 14px;
 }
 
 .preview-mosaic figure {
     position: relative;
-    min-height: 190px;
+    min-width: 0;
     margin: 0;
     overflow: hidden;
     border-radius: 8px;
@@ -1247,41 +1249,30 @@ a {
     background: var(--soft);
 }
 
-.preview-mosaic .preview-large {
-    grid-row: span 2;
-}
-
 .preview-mosaic img {
     width: 100%;
-    height: 100%;
+    aspect-ratio: 4 / 3;
+    height: auto;
     display: block;
-    object-fit: cover;
-    transform: scale(1.03);
-    transition: transform .6s ease, filter .6s ease;
+    object-fit: contain;
+    background: var(--soft);
+    transform: none;
 }
 
 .preview-mosaic figure:hover img {
-    transform: scale(1.1);
-    filter: saturate(1.08) contrast(1.04);
+    transform: none;
+    filter: none;
 }
 
 .preview-mosaic figcaption {
-    position: absolute;
-    left: 14px;
-    right: 14px;
-    bottom: 14px;
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    width: fit-content;
-    min-height: 34px;
-    padding: 0 12px;
-    color: var(--white);
-    background: rgba(15, 36, 31, .72);
-    border: 1px solid rgba(255, 255, 255, .2);
-    border-radius: 999px;
+    min-height: 42px;
+    padding: 10px 14px;
+    color: var(--forest);
+    background: var(--white);
     font-size: 13px;
     font-weight: 900;
-    backdrop-filter: blur(12px);
 }
 
 .facilities {
@@ -2876,11 +2867,6 @@ a {
 
     .preview-mosaic {
         grid-template-columns: 1fr;
-        grid-auto-rows: 220px;
-    }
-
-    .preview-mosaic .preview-large {
-        grid-row: span 1;
     }
 
     .browser-head {

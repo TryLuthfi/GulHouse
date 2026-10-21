@@ -47,6 +47,10 @@
                 <a class="back-link" href="<?= base_url(); ?>">Kembali ke daftar kamar</a>
                 <p class="eyebrow"><?= html_escape($room['code']); ?></p>
                 <h1><?= html_escape($room['name']); ?></h1>
+                <?php if (($room['property_type'] ?? '') === 'apartment'): ?>
+                    <p><?= html_escape(!empty($room['city']) ? $room['city'] : 'Kota unit belum diatur'); ?></p>
+                    <?php if (!empty($room['property_address'])): ?><p><?= nl2br(html_escape($room['property_address'])); ?></p><?php endif; ?>
+                <?php endif; ?>
                 <p><?= html_escape($room['public_description']); ?></p>
             </div>
             <aside class="detail-booking-card reveal delay-1">

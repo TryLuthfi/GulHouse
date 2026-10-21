@@ -31,7 +31,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20261021-landing-photos'); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/landing/css/landing.css?v=20261021-photo-focus-preview-equal'); ?>">
 </head>
 <body>
     <header class="site-header" id="top">
@@ -148,7 +148,8 @@
                 if (! isset($roomsByProperty[$propertyCode])) {
                     $roomsByProperty[$propertyCode] = array(
                         'code' => $propertyCode,
-                        'city' => isset($room['city']) ? $room['city'] : '',
+                        'display_name' => !empty($room['property_name']) ? $room['property_name'] : $propertyCode,
+                        'city' => ($room['property_type'] ?? '') === 'apartment' ? 'Lokasi mengikuti masing-masing unit' : (isset($room['city']) ? $room['city'] : ''),
                         'price_from' => 0,
                         'total_rooms' => 0,
                         'available_count' => 0,
@@ -166,7 +167,7 @@
                 $roomsByProperty[$propertyCode]['total_rooms'] += (int) $room['total_rooms'];
                 $roomsByProperty[$propertyCode]['available_count'] += (int) $room['available_count'];
                 $roomsByProperty[$propertyCode]['types'][] = array(
-                    'name' => $room['type_name'],
+                    'name' => isset($room['property_type']) && $room['property_type'] === 'apartment' ? $room['name'] : $room['type_name'],
                     'available_count' => (int) $room['available_count'],
                     'total_rooms' => (int) $room['total_rooms'],
                     'price' => $price,
@@ -186,7 +187,7 @@
                 <?php $propertyIndex = 0; ?>
                 <?php foreach ($roomsByProperty as $property): ?>
                     <article class="type-card property-room-card <?= (int) $property['available_count'] <= 0 ? 'is-unavailable' : ''; ?> reveal delay-<?= ($propertyIndex % 4); ?>">
-                        <span><?= html_escape($property['code']); ?></span>
+                        <span><?= html_escape($property['display_name']); ?></span>
                         <small class="property-city"><?= html_escape(! empty($property['city']) ? $property['city'] : 'Lokasi belum diatur'); ?></small>
                         <strong>Mulai Rp <?= number_format((int) $property['price_from'], 0, ',', '.'); ?></strong>
                         <p><?= (int) $property['available_count']; ?> tersedia dari <?= (int) $property['total_rooms']; ?> kamar</p>
@@ -234,9 +235,13 @@
         </section>
 
         <?php
+            $publicPropertyGroup = function (array $room) {
+                return isset($room['property_type']) && $room['property_type'] === 'apartment' ? 'APT' : $room['code'];
+            };
             $filterProperties = array();
             foreach ($all_rooms as $room) {
-                $filterProperties[$room['code']] = $room['code'];
+                $propertyGroup = $publicPropertyGroup($room);
+                $filterProperties[$propertyGroup] = $propertyGroup;
             }
             ksort($filterProperties);
         ?>
@@ -253,7 +258,7 @@
             </div>
                 <div class="room-filter catalog-room-filter" data-room-filter>
                     <div class="filter-group" data-filter-group="property">
-                        <span>Jenis Gedung</span>
+                        <span>Jenis Hunian</span>
                         <div>
                             <button type="button" class="is-active" data-filter-field="property" data-filter-value="all">Semua</button>
                             <?php foreach ($filterProperties as $propertyCode): ?>
@@ -264,15 +269,14 @@
                 </div>
             <div class="room-carousel" data-carousel>
                 <?php foreach ($featured_rooms as $index => $room): ?>
-                    <article class="room-card" data-carousel-slide data-room-card data-property="<?= html_escape($room['code']); ?>" data-type="<?= html_escape($room['type_name']); ?>" data-status="<?= (int) $room['available_count'] > 0 ? 'available' : 'unavailable'; ?>">
-                        <div
-                            class="room-photo<?= empty($room['cover_image']) ? ' room-photo-empty' : ''; ?>"
-                            data-parallax-card
+                    <article class="room-card" data-carousel-slide data-room-card data-property="<?= html_escape($publicPropertyGroup($room)); ?>" data-property-code="<?= html_escape($room['code']); ?>" data-type="<?= html_escape($room['type_name']); ?>" data-status="<?= (int) $room['available_count'] > 0 ? 'available' : 'unavailable'; ?>">
+                        <div class="room-photo<?= empty($room['cover_image']) ? ' room-photo-empty' : ''; ?>">
                             <?php if (! empty($room['cover_image'])): ?>
-                                style="background-image: url('<?= html_escape($room['cover_image']); ?>');"
-                            <?php endif; ?>><?php if (empty($room['cover_image'])): ?><span>Foto belum tersedia</span><?php endif; ?></div>
+                                <img src="<?= html_escape($room['cover_image']); ?>" alt="<?= html_escape('Kamar ' . $room['name']); ?>" loading="lazy" decoding="async" style="object-position: <?= (int) (isset($room['image_focus_x']) ? $room['image_focus_x'] : 50); ?>% <?= (int) (isset($room['image_focus_y']) ? $room['image_focus_y'] : 70); ?>%;">
+                            <?php else: ?><span>Foto belum tersedia</span><?php endif; ?>
+                        </div>
                         <div class="room-body">
-                            <span><?= html_escape($room['code']); ?></span>
+                            <span><?= html_escape($publicPropertyGroup($room)); ?></span>
                             <h3><?= html_escape($room['name']); ?></h3>
                             <p class="room-city"><?= html_escape(! empty($room['city']) ? $room['city'] : 'Lokasi belum diatur'); ?></p>
                             <p><?= (int) $room['available_count']; ?> kamar tersedia, mulai Rp <?= number_format((int) $room['price'], 0, ',', '.'); ?>/bulan</p>
@@ -296,7 +300,7 @@
             </div>
             <div class="preview-mosaic reveal delay-1">
                 <?php foreach ($preview_photos as $index => $photo): ?>
-                    <figure class="<?= $index === 0 ? 'preview-large' : ''; ?>">
+                    <figure>
                         <img src="<?= html_escape($photo['src']); ?>" alt="<?= html_escape($photo['title']); ?>" loading="lazy" decoding="async">
                         <figcaption><?= html_escape($photo['category']); ?></figcaption>
                     </figure>
