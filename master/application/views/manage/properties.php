@@ -1,22 +1,11 @@
 <?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
 <?php
-    $totalProperties = count($rows);
-    $activeProperties = 0;
-    $houseProperties = 0;
-    $apartmentProperties = 0;
-    foreach ($rows as $propertyRow) {
-        if ((int) $propertyRow['is_active'] === 1) {
-            $activeProperties++;
-        }
-        if ($propertyRow['property_type'] === 'house') {
-            $houseProperties++;
-        }
-        if ($propertyRow['property_type'] === 'apartment') {
-            $apartmentProperties++;
-        }
-    }
-    $metricUrl = function (array $set = array()) use ($filters) {
-        $params = $filters;
+    $totalProperties = (int) $summary['total'];
+    $activeProperties = (int) $summary['active'];
+    $houseProperties = (int) $summary['house'];
+    $apartmentProperties = (int) $summary['apartment'];
+    $metricUrl = function (array $set = array()) use ($filters, $pagination) {
+        $params = array_merge($filters, array('per_page' => $pagination['per_page'], 'sort' => $pagination['sort'], 'dir' => $pagination['dir']));
         $active = ! empty($set);
         foreach ($set as $key => $value) {
             if (! isset($filters[$key]) || (string) $filters[$key] !== (string) $value) {
@@ -52,8 +41,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261020-admin-ui-1'); ?>">
-<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script></head>
-<body class="gh-admin-ui">
+<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script><link rel="stylesheet" href="<?= base_url('assets/master/css/master-pagination.css?v=20261021-1'); ?>"></head>
+<body class="gh-admin-ui" data-master-paged>
     <?php $this->load->view('partials/sidebar', array('active_menu' => 'properties')); ?>
 
     <main class="main-shell">
@@ -77,7 +66,7 @@
                 <div><p>Data</p><h2>Daftar Properti</h2></div>
                 <button type="button" class="mini-link" data-open-modal="#property-create-modal">Tambah Properti</button>
             </div>
-            <form class="filter-form master-filter-form" method="get" action="<?= base_url('properties'); ?>">
+            <form data-master-paged-filter class="filter-form master-filter-form" method="get" action="<?= base_url('properties'); ?>">
                 <label>Jenis
                     <select name="type">
                         <option value="">Semua jenis</option>
@@ -96,6 +85,7 @@
                 <label>Cari
                     <input type="search" name="q" value="<?= html_escape($filters['q']); ?>" placeholder="Kode, nama, kota, alamat">
                 </label>
+                <?php $this->load->view('partials/master_pagination', array('pagination' => $pagination, 'allowed_sorts' => $allowed_sorts, 'filters' => $filters, 'master_route' => 'properties', 'pagination_controls' => TRUE)); ?>
                 <button type="submit">Tampilkan</button>
                 <a class="mini-link" href="<?= base_url('properties'); ?>">Reset</a>
             </form>
@@ -112,7 +102,7 @@
                                 <td><span class="badge <?= (int) $row['is_active'] ? 'good' : 'muted'; ?>"><?= (int) $row['is_active'] ? 'Aktif' : 'Nonaktif'; ?></span></td>
                                 <td>
                                     <div class="table-actions">
-                                        <button type="button" class="table-action" data-open-modal="#property-edit-<?= (int) $row['id']; ?>">Edit</button>
+                                        <button type="button" class="table-action" data-edit-form-url="<?= base_url('master-form/properties/' . (int) $row['id']); ?>">Edit</button>
                                         <button type="button" class="table-action danger" data-delete-url="<?= base_url('properties/delete/' . (int) $row['id']); ?>" data-delete-label="<?= html_escape($row['code']); ?>">Hapus</button>
                                     </div>
                                 </td>
@@ -122,6 +112,7 @@
                     </tbody>
                 </table>
             </div>
+            <?php $this->load->view('partials/master_pagination', array('pagination' => $pagination, 'filters' => $filters, 'master_route' => 'properties', 'pagination_controls' => FALSE)); ?>
         </section>
     </main>
 
@@ -150,32 +141,7 @@
         </section>
     </div>
 
-    <?php foreach ($rows as $row): ?>
-        <div class="modal" id="property-edit-<?= (int) $row['id']; ?>" aria-hidden="true">
-            <div class="modal-backdrop" data-close-modal></div>
-            <section class="modal-card">
-                <div class="modal-head"><h2>Edit <?= html_escape($row['code']); ?></h2><button type="button" data-close-modal>x</button></div>
-                <form class="manage-form sectioned" method="post" action="<?= base_url('properties/save'); ?>" data-confirm-submit>
-                    <input type="hidden" name="id" value="<?= (int) $row['id']; ?>">
-                    <div class="form-section">
-                        <h3 class="form-section-title">Identitas Properti</h3>
-                        <label>Kode<input type="text" name="code" maxlength="30" required value="<?= html_escape($row['code']); ?>"></label>
-                        <label>Nama<input type="text" name="name" maxlength="120" required value="<?= html_escape($row['name']); ?>"></label>
-                        <label>Tipe Properti
-                            <select name="property_type">
-                                <?php foreach (array('house' => 'House', 'apartment' => 'Apartment', 'other' => 'Other') as $value => $label): ?>
-                                    <option value="<?= $value; ?>" <?= $row['property_type'] === $value ? 'selected' : ''; ?>><?= $label; ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label class="check-row"><input type="checkbox" name="is_active" value="1" <?= (int) $row['is_active'] === 1 ? 'checked' : ''; ?>> Aktif</label>
-                    </div>
-                    <?php $this->load->view('partials/location_fields', array('location_row' => $row, 'location_scope' => 'property', 'region_data' => $region_data ?? array())); ?>
-                    <div class="form-actions"><button type="submit">Simpan Perubahan</button></div>
-                </form>
-            </section>
-        </div>
-    <?php endforeach; ?>
+
 
     <div class="modal confirm-modal" data-save-confirm-modal aria-hidden="true">
         <div class="modal-backdrop" data-close-modal></div>
@@ -196,7 +162,7 @@
     </div>
 
     <script id="gh-region-data" type="application/json"><?= json_encode($region_data ?? array(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?></script>
-    <script src="<?= base_url('assets/master/js/region-location.js?v=20261021-1'); ?>"></script>
-    <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/region-location.js?v=20261021-pagination-1'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261021-pagination-1'); ?>"></script>
 </body>
 </html>

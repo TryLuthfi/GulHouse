@@ -1,20 +1,11 @@
 <?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
 <?php
-    $totalTypes = count($rows);
-    $activeTypes = 0;
-    $usedTypes = 0;
-    $totalRooms = 0;
-    foreach ($rows as $typeRow) {
-        if ((int) $typeRow['is_active'] === 1) {
-            $activeTypes++;
-        }
-        if ((int) $typeRow['room_count'] > 0) {
-            $usedTypes++;
-        }
-        $totalRooms += (int) $typeRow['room_count'];
-    }
-    $metricUrl = function (array $set = array()) use ($filters) {
-        $params = $filters;
+    $totalTypes = (int) $summary['total'];
+    $activeTypes = (int) $summary['active'];
+    $usedTypes = (int) $summary['used'];
+    $totalRooms = (int) $summary['rooms'];
+    $metricUrl = function (array $set = array()) use ($filters, $pagination) {
+        $params = array_merge($filters, array('per_page' => $pagination['per_page'], 'sort' => $pagination['sort'], 'dir' => $pagination['dir']));
         $active = ! empty($set);
         foreach ($set as $key => $value) {
             if (! isset($filters[$key]) || (string) $filters[$key] !== (string) $value) {
@@ -50,8 +41,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261020-admin-ui-1'); ?>">
-<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script></head>
-<body class="gh-admin-ui">
+<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script><link rel="stylesheet" href="<?= base_url('assets/master/css/master-pagination.css?v=20261021-1'); ?>"></head>
+<body class="gh-admin-ui" data-master-paged>
     <?php $this->load->view('partials/sidebar', array('active_menu' => 'room-types')); ?>
 
     <main class="main-shell">
@@ -75,7 +66,7 @@
                 <div><p>Data</p><h2>Daftar Tipe</h2></div>
                 <button type="button" class="mini-link" data-open-modal="#type-create-modal">Tambah Tipe</button>
             </div>
-            <form class="filter-form master-filter-form" method="get" action="<?= base_url('room-types'); ?>">
+            <form data-master-paged-filter class="filter-form master-filter-form" method="get" action="<?= base_url('room-types'); ?>">
                 <?php if (! empty($filters['usage'])): ?><input type="hidden" name="usage" value="<?= html_escape($filters['usage']); ?>"><?php endif; ?>
                 <label>Jenis Properti
                     <select name="property_type">
@@ -95,6 +86,7 @@
                 <label>Cari
                     <input type="search" name="q" value="<?= html_escape($filters['q']); ?>" placeholder="Tipe, deskripsi, properti">
                 </label>
+                <?php $this->load->view('partials/master_pagination', array('pagination' => $pagination, 'allowed_sorts' => $allowed_sorts, 'filters' => $filters, 'master_route' => 'room-types', 'pagination_controls' => TRUE)); ?>
                 <button type="submit">Tampilkan</button>
                 <a class="mini-link" href="<?= base_url('room-types'); ?>">Reset</a>
             </form>
@@ -119,7 +111,7 @@
                                 <td><span class="badge <?= (int) $row['is_active'] ? 'good' : 'muted'; ?>"><?= (int) $row['is_active'] ? 'Aktif' : 'Nonaktif'; ?></span></td>
                                 <td>
                                     <div class="table-actions">
-                                        <button type="button" class="table-action" data-open-modal="#type-edit-<?= (int) $row['id']; ?>">Edit</button>
+                                        <button type="button" class="table-action" data-edit-form-url="<?= base_url('master-form/room-types/' . (int) $row['id']); ?>">Edit</button>
                                         <button type="button" class="table-action danger" data-delete-url="<?= base_url('room-types/delete/' . (int) $row['id']); ?>" data-delete-label="<?= html_escape($row['name']); ?>">Hapus</button>
                                     </div>
                                 </td>
@@ -129,6 +121,7 @@
                     </tbody>
                 </table>
             </div>
+            <?php $this->load->view('partials/master_pagination', array('pagination' => $pagination, 'filters' => $filters, 'master_route' => 'room-types', 'pagination_controls' => FALSE)); ?>
         </section>
     </main>
 
@@ -152,27 +145,7 @@
         </section>
     </div>
 
-    <?php foreach ($rows as $row): ?>
-        <div class="modal" id="type-edit-<?= (int) $row['id']; ?>" aria-hidden="true">
-            <div class="modal-backdrop" data-close-modal></div>
-            <section class="modal-card">
-                <div class="modal-head"><h2>Edit <?= html_escape($row['name']); ?></h2><button type="button" data-close-modal>x</button></div>
-                <form class="manage-form sectioned" method="post" action="<?= base_url('room-types/save'); ?>" data-confirm-submit>
-                    <input type="hidden" name="id" value="<?= (int) $row['id']; ?>">
-                    <div class="form-section">
-                        <h3 class="form-section-title">Identitas Tipe</h3>
-                        <label>Nama Tipe<input type="text" name="name" maxlength="80" required value="<?= html_escape($row['name']); ?>"></label>
-                        <label class="check-row"><input type="checkbox" name="is_active" value="1" <?= (int) $row['is_active'] === 1 ? 'checked' : ''; ?>> Aktif</label>
-                    </div>
-                    <div class="form-section">
-                        <h3 class="form-section-title">Deskripsi Landing</h3>
-                        <label class="full">Deskripsi<textarea name="description" rows="5"><?= html_escape((string) $row['description']); ?></textarea></label>
-                    </div>
-                    <div class="form-actions"><button type="submit">Simpan Perubahan</button></div>
-                </form>
-            </section>
-        </div>
-    <?php endforeach; ?>
+
 
     <div class="modal confirm-modal" data-save-confirm-modal aria-hidden="true">
         <div class="modal-backdrop" data-close-modal></div>
@@ -192,6 +165,6 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261021-pagination-1'); ?>"></script>
 </body>
 </html>

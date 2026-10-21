@@ -14,7 +14,10 @@
             }
         });
     }
-    document.querySelectorAll('[data-location-scope]').forEach(function (section) {
+    function initLocations(container) {
+    (container || document).querySelectorAll('[data-location-scope]').forEach(function (section) {
+        if (section.getAttribute('data-region-ready') === 'true') { return; }
+        section.setAttribute('data-region-ready', 'true');
         var form = section.closest('form');
         var province = section.querySelector('[data-region-province]');
         var regency = section.querySelector('[data-region-regency]');
@@ -54,4 +57,7 @@
         form.addEventListener('reset', function () { window.setTimeout(sync, 0); });
         sync();
     });
+    }
+    window.GHInitRegionLocations = initLocations;
+    initLocations(document);
 }());

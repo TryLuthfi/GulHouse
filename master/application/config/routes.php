@@ -15,6 +15,7 @@ $route['login'] = 'auth/login';
 $route['logout'] = 'auth/logout';
 $route['dashboard'] = 'dashboard';
 $route['properties'] = 'manage/properties';
+$route['master-form/(:any)/(:num)'] = 'manage/master_form/$1/$2';
 $route['properties/save'] = 'manage/save_property';
 $route['properties/delete/(:num)'] = 'manage/delete_property/$1';
 $route['room-types'] = 'manage/room_types';

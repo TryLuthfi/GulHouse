@@ -1,9 +1,22 @@
 (function () {
-    function openModal(modal) {
+    var pendingForm = null;
+    var masterModalHeadingSequence = 0;
+    function openModal(modal, opener) {
         if (!modal) {
             return;
         }
 
+        modal.__ghReturnFocus = opener || document.activeElement;
+        var dialog = modal.querySelector('.modal-card') || modal;
+        dialog.setAttribute('role', 'dialog');
+        dialog.setAttribute('aria-modal', 'true');
+        var heading = dialog.querySelector('h2');
+        if (heading && !dialog.hasAttribute('aria-labelledby')) {
+            if (!heading.id) {
+                do { masterModalHeadingSequence += 1; heading.id = 'master-modal-heading-' + masterModalHeadingSequence; } while (document.getElementById(heading.id) !== heading);
+            }
+            dialog.setAttribute('aria-labelledby', heading.id);
+        }
         modal.classList.add('is-open');
         modal.setAttribute('aria-hidden', 'false');
         var focusTarget = modal.querySelector('input, select, textarea, button');
@@ -19,6 +32,8 @@
 
         modal.classList.remove('is-open');
         modal.setAttribute('aria-hidden', 'true');
+        var opener = modal.__ghReturnFocus;
+        if (opener && opener.isConnected && !opener.disabled) { opener.focus(); }
     }
 
     function initModals() {
@@ -59,7 +74,6 @@
     }
 
     function initConfirmSave() {
-        var pendingForm = null;
         var confirmModal = document.querySelector('[data-save-confirm-modal]');
         var confirmButton = document.querySelector('[data-confirm-save]');
 
@@ -169,6 +183,69 @@
         initTenantCascadingFilters();
         initPhotoCategoryTabs();
         initPhotoPreview();
+        initLazyMasterForms();
+        if (window.GHInitRegionLocations) { window.GHInitRegionLocations(document); }
+    }
+
+    function initLazyMasterForms() {
+        document.querySelectorAll('[data-edit-form-url]').forEach(function (trigger) {
+            if (trigger.getAttribute('data-edit-ready') === 'true') { return; }
+            trigger.setAttribute('data-edit-ready', 'true');
+            trigger.addEventListener('click', function () {
+                if (trigger.disabled) { return; }
+                var url = new URL(trigger.getAttribute('data-edit-form-url'), window.location.href);
+                if (url.origin !== window.location.origin) { return; }
+                var status = document.querySelector('[data-master-form-status]');
+                if (!status) {
+                    status = document.createElement('div');
+                    status.setAttribute('data-master-form-status', '');
+                    status.setAttribute('role', 'status');
+                    status.setAttribute('aria-live', 'polite');
+                    document.querySelector('.main-shell').prepend(status);
+                }
+                status.hidden = false;
+                status.className = 'master-form-load-status';
+                status.setAttribute('role', 'status');
+                status.textContent = 'Memuat form terbaru…';
+                var originalLabel = trigger.textContent;
+                trigger.textContent = 'Memuat…';
+                trigger.disabled = true;
+                trigger.setAttribute('aria-busy', 'true');
+                fetch(url.toString(), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, cache: 'no-store' })
+                    .then(function (response) {
+                        if (response.status === 401) {
+                            window.location.reload();
+                            throw new Error('Sesi berakhir. Silakan login kembali.');
+                        }
+                        if (response.redirected && new URL(response.url).pathname.indexOf('/login') !== -1) {
+                            window.location.assign(response.url);
+                            throw new Error('Sesi berakhir. Silakan login kembali.');
+                        }
+                        if (!response.ok) { throw new Error(response.status === 404 ? 'Data tidak ditemukan. Muat ulang daftar dan coba kembali.' : 'Form belum dapat dimuat. Silakan coba kembali.'); }
+                        return response.text();
+                    })
+                    .then(function (html) {
+                        var parsed = new DOMParser().parseFromString(html, 'text/html');
+                        var modal = parsed.querySelector('.modal');
+                        if (!modal || !modal.id || !modal.querySelector('form')) { throw new Error('Form belum tersedia atau sesi berakhir. Muat ulang halaman untuk melanjutkan.'); }
+                        modal.querySelectorAll('script').forEach(function (script) { script.remove(); });
+                        var old = document.getElementById(modal.id);
+                        if (old) { old.remove(); }
+                        document.body.appendChild(modal);
+                        initDynamicControls();
+                        status.hidden = true;
+                        trigger.disabled = false;
+                        openModal(modal, trigger);
+                    })
+                    .catch(function (error) {
+                        status.className = 'master-form-load-status is-error';
+                        status.textContent = error.message || 'Koneksi terputus. Silakan coba kembali.';
+                        status.setAttribute('role', 'alert');
+                        status.scrollIntoView({ block: 'nearest' });
+                    })
+                    .finally(function () { trigger.disabled = false; trigger.textContent = originalLabel; trigger.removeAttribute('aria-busy'); });
+            });
+        });
     }
 
     function replaceMasterContent(html) {
@@ -235,11 +312,15 @@
                 return;
             }
 
+            // Paged masters use normal navigation so all option catalogs and forms stay current.
+            if (document.body.hasAttribute('data-master-paged')) { return; }
+
             event.preventDefault();
             loadMasterPartial(url.toString(), true);
         });
 
         window.addEventListener('popstate', function () {
+            if (document.body.hasAttribute('data-master-paged')) { return; }
             loadMasterPartial(window.location.href, false);
         });
 

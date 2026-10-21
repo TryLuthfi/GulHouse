@@ -1,9 +1,10 @@
 <?php defined('BASEPATH') OR exit('No direct script access allowed'); ?>
 <?php
-    function gh_money_input($value) {
+    if (!function_exists('gh_money_input')) { function gh_money_input($value) {
         return $value !== null && $value !== '' ? 'Rp ' . number_format((int) $value, 0, ',', '.') : '';
     }
-    function gh_split_birth_place_date($value) {
+    }
+    if (!function_exists('gh_split_birth_place_date')) { function gh_split_birth_place_date($value) {
         $value = trim((string) $value);
         if ($value === '') {
             return array('place' => '', 'date' => '', 'date_text' => '');
@@ -16,6 +17,7 @@
 
         return array('place' => $place, 'date' => $date, 'date_text' => $dateText);
     }
+    }
     $statusLabels = array(
         'active' => 'Aktif',
         'reserved' => 'Booking',
@@ -23,12 +25,7 @@
         'empty' => 'Kosong',
         'ended' => 'Selesai',
     );
-    $counts = array('active' => 0, 'reserved' => 0, 'internal' => 0, 'empty' => 0, 'ended' => 0);
-    foreach ($rows as $row) {
-        if (isset($counts[$row['stay_status']])) {
-            $counts[$row['stay_status']]++;
-        }
-    }
+    $counts = $summary;
     $emptyStay = array(
         'id' => 0,
         'tenant_id' => 0,
@@ -53,7 +50,7 @@
         'relationship' => '',
         'emergency_phone' => '',
     );
-    $modalRows = array_merge(array($emptyStay), $rows);
+    $modalRows = array($emptyStay);
     $roomLookup = array();
     $typePropertyMap = array();
     $propertyTypeMap = array();
@@ -73,8 +70,8 @@
         }
         $propertyTypeMap[$propertyId][$typeId] = $typeId;
     }
-    $metricUrl = function (array $set = array()) use ($filters) {
-        $params = $filters;
+    $metricUrl = function (array $set = array()) use ($filters, $pagination) {
+        $params = array_merge($filters, array('per_page' => $pagination['per_page'], 'sort' => $pagination['sort'], 'dir' => $pagination['dir']));
         $active = ! empty($set);
         foreach ($set as $key => $value) {
             if (! isset($filters[$key]) || (string) $filters[$key] !== (string) $value) {
@@ -110,8 +107,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= base_url('assets/master/css/master.css?v=20261020-admin-ui-1'); ?>">
-<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script></head>
-<body class="gh-admin-ui">
+<link rel="stylesheet" href="<?= base_url('assets/master/css/admin-guidelines.css?v=20261020-6'); ?>"><script src="<?= base_url('assets/master/js/admin-guidelines.js?v=20261020-2'); ?>" defer></script><link rel="stylesheet" href="<?= base_url('assets/master/css/master-pagination.css?v=20261021-1'); ?>"></head>
+<body class="gh-admin-ui" data-master-paged>
     <?php $this->load->view('partials/sidebar', array('active_menu' => 'tenants')); ?>
 
     <main class="main-shell">
@@ -135,7 +132,7 @@
                 <div><p>Data</p><h2>Daftar Penghuni & Stay</h2></div>
                 <button type="button" class="mini-link" data-open-modal="#tenant-create-modal">Tambah Penghuni</button>
             </div>
-            <form class="filter-form master-wide-filter-form" method="get" action="<?= base_url('tenants'); ?>" data-tenant-cascade-form>
+            <form data-master-paged-filter class="filter-form master-wide-filter-form" method="get" action="<?= base_url('tenants'); ?>" data-tenant-cascade-form>
                 <label>Properti
                     <select name="property_id" data-tenant-property-filter data-cascade-template="tenant-filter-properties">
                         <option value="">Semua properti</option>
@@ -179,6 +176,7 @@
                 <label>Cari
                     <input type="search" name="q" value="<?= html_escape($filters['q']); ?>" placeholder="Nama, HP, NIK, unit">
                 </label>
+                <?php $this->load->view('partials/master_pagination', array('pagination' => $pagination, 'allowed_sorts' => $allowed_sorts, 'filters' => $filters, 'master_route' => 'tenants', 'pagination_controls' => TRUE)); ?>
                 <button type="submit">Tampilkan</button>
                 <a class="mini-link" href="<?= base_url('tenants'); ?>">Reset</a>
             </form>
@@ -221,7 +219,7 @@
                                 <td>
                                     <div class="table-actions">
                                         <?php if ($row['tenant_id'] && in_array($row['stay_status'], array('active', 'reserved'), TRUE)): ?><button type="button" class="table-action" data-open-modal="#stay-contract-<?= (int) $row['id']; ?>">Draft Kontrak</button><?php endif; ?>
-                                        <button type="button" class="table-action" data-open-modal="#tenant-edit-<?= (int) $row['id']; ?>">Edit</button>
+                                        <button type="button" class="table-action" data-edit-form-url="<?= base_url('master-form/tenants/' . (int) $row['id']); ?>">Edit</button>
                                         <?php if ($row['stay_status'] !== 'ended'): ?>
                                             <button type="button" class="table-action danger" data-delete-url="<?= base_url('tenants/end-stay/' . (int) $row['id']); ?>" data-delete-label="<?= html_escape($row['fullname'] ? $row['fullname'] : $row['source_unit_name']); ?>">Akhiri</button>
                                         <?php endif; ?>
@@ -233,102 +231,11 @@
                     </tbody>
                 </table>
             </div>
+            <?php $this->load->view('partials/master_pagination', array('pagination' => $pagination, 'filters' => $filters, 'master_route' => 'tenants', 'pagination_controls' => FALSE)); ?>
         </section>
     </main>
 
-    <?php foreach ($modalRows as $modalRow): ?>
-        <?php $isCreate = (int) $modalRow['id'] === 0; ?>
-        <?php
-            $selectedRoom = isset($roomLookup[(int) $modalRow['room_id']]) ? $roomLookup[(int) $modalRow['room_id']] : null;
-            $selectedPropertyId = $selectedRoom ? (int) $selectedRoom['property_id'] : 0;
-            $selectedTypeId = $selectedRoom ? (int) $selectedRoom['room_type_id'] : 0;
-            $birthParts = gh_split_birth_place_date($modalRow['birth_place_date']);
-        ?>
-        <div class="modal wide" id="<?= $isCreate ? 'tenant-create-modal' : 'tenant-edit-' . (int) $modalRow['id']; ?>" aria-hidden="true">
-            <div class="modal-backdrop" data-close-modal></div>
-            <section class="modal-card wide">
-                <div class="modal-head"><h2><?= $isCreate ? 'Tambah Penghuni' : 'Edit ' . html_escape($modalRow['fullname'] ? $modalRow['fullname'] : $modalRow['source_unit_name']); ?></h2><button type="button" data-close-modal>x</button></div>
-                <form class="manage-form tenant-form sectioned" method="post" action="<?= base_url('tenants/save'); ?>" data-confirm-submit data-tenant-cascade-form>
-                    <input type="hidden" name="stay_id" value="<?= (int) $modalRow['id']; ?>">
-                    <input type="hidden" name="tenant_id" value="<?= (int) $modalRow['tenant_id']; ?>">
-                    <input type="hidden" name="birth_date_text" value="<?= html_escape($birthParts['date_text']); ?>">
-                    <div class="form-section">
-                        <h3 class="form-section-title">Relasi Stay</h3>
-                        <label>Properti
-                            <select data-tenant-property-filter data-cascade-template="tenant-modal-properties-<?= (int) $modalRow['id']; ?>">
-                                <option value="">Semua properti</option>
-                                <?php foreach ($properties as $property): ?>
-                                    <?php
-                                        $propertyId = (int) $property['id'];
-                                        $typeIds = ! empty($propertyTypeMap[$propertyId]) ? implode(',', array_values($propertyTypeMap[$propertyId])) : '';
-                                    ?>
-                                    <option value="<?= $propertyId; ?>" data-type-ids="<?= html_escape($typeIds); ?>" <?= $selectedPropertyId === $propertyId ? 'selected' : ''; ?>><?= html_escape($property['code'] . ' - ' . $property['name']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label>Tipe Kamar
-                            <select data-tenant-type-filter data-cascade-template="tenant-room-types">
-                                <option value="">Semua tipe</option>
-                                <?php foreach ($room_types as $type): ?>
-                                    <?php
-                                        $typeId = (int) $type['id'];
-                                        $propertyIds = ! empty($typePropertyMap[$typeId]) ? implode(',', array_values($typePropertyMap[$typeId])) : '';
-                                    ?>
-                                    <option value="<?= $typeId; ?>" data-property-ids="<?= html_escape($propertyIds); ?>" <?= $selectedTypeId === $typeId ? 'selected' : ''; ?>><?= html_escape($type['name']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label>Unit
-                            <select name="room_id" required data-tenant-room-select data-cascade-template="tenant-rooms">
-                                <option value="">Pilih unit</option>
-                                <?php foreach ($rooms as $room): ?>
-                                    <option value="<?= (int) $room['id']; ?>" data-property-id="<?= (int) $room['property_id']; ?>" data-type-id="<?= (int) $room['room_type_id']; ?>" <?= (int) $modalRow['room_id'] === (int) $room['id'] ? 'selected' : ''; ?>>
-                                        <?= html_escape($room['property_code'] . ' - ' . $room['room_label'] . ' (' . $room['room_code'] . ' / ' . $room['type_name'] . ')'); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label>Status Stay
-                            <select name="stay_status">
-                                <?php foreach ($statusLabels as $status => $label): ?>
-                                    <option value="<?= $status; ?>" <?= $modalRow['stay_status'] === $status ? 'selected' : ''; ?>><?= html_escape($label); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                    </div>
-                    <div class="form-section">
-                        <h3 class="form-section-title">Data Penghuni</h3>
-                        <label>Nama Penghuni<input type="text" name="fullname" value="<?= html_escape((string) $modalRow['fullname']); ?>" placeholder="Nama lengkap"></label>
-                        <label>No. HP<input type="text" name="phone" value="<?= html_escape((string) $modalRow['phone']); ?>" placeholder="08xxxxxxxxxx"></label>
-                        <label>NIK<input type="text" name="identity_number" value="<?= html_escape((string) $modalRow['identity_number']); ?>" placeholder="16 digit"></label>
-                        <label>Tempat Lahir<input type="text" name="birth_place" value="<?= html_escape($birthParts['place']); ?>" placeholder="Jakarta"></label>
-                        <label>Tanggal Lahir<input type="date" name="birth_date" value="<?= html_escape($birthParts['date']); ?>"></label>
-                        <label>Agama<input type="text" name="religion" value="<?= html_escape((string) $modalRow['religion']); ?>"></label>
-                        <label>Status<input type="text" name="marital_status" value="<?= html_escape((string) $modalRow['marital_status']); ?>" placeholder="Lajang/Menikah"></label>
-                        <label>Pekerjaan<input type="text" name="occupation" value="<?= html_escape((string) $modalRow['occupation']); ?>"></label>
-                    </div>
-                    <div class="form-section">
-                        <h3 class="form-section-title">Masa Tinggal dan Harga</h3>
-                        <label>Check In<input type="date" name="check_in_date" value="<?= html_escape((string) $modalRow['check_in_date']); ?>"></label>
-                        <label>Check Out<input type="date" name="check_out_date" value="<?= html_escape((string) $modalRow['check_out_date']); ?>"></label>
-                        <label>Harga Bulanan<input type="text" name="monthly_price" inputmode="numeric" value="<?= html_escape(gh_money_input($modalRow['monthly_price'])); ?>" placeholder="Rp 2.500.000" data-money-input></label>
-                        <label>Deposit<input type="text" name="deposit" inputmode="numeric" value="<?= html_escape(gh_money_input($modalRow['deposit'])); ?>" placeholder="Rp 1.000.000" data-money-input></label>
-                        <label>Periode Sumber<input type="text" name="source_period" value="<?= html_escape((string) $modalRow['source_period']); ?>" placeholder="September 2026"></label>
-                        <label>Unit Sumber<input type="text" name="source_unit_name" value="<?= html_escape((string) $modalRow['source_unit_name']); ?>" placeholder="EPHESUS 210"></label>
-                    </div>
-                    <div class="form-section">
-                        <h3 class="form-section-title">Darurat dan Catatan</h3>
-                        <label>Kontak Darurat<input type="text" name="emergency_name" value="<?= html_escape((string) $modalRow['contact_name']); ?>"></label>
-                        <label>Hubungan<input type="text" name="emergency_relationship" value="<?= html_escape((string) $modalRow['relationship']); ?>" placeholder="Ibu/Adik/Teman"></label>
-                        <label>No. HP Darurat<input type="text" name="emergency_phone" value="<?= html_escape((string) $modalRow['emergency_phone']); ?>"></label>
-                        <label class="full">Alamat<textarea name="address" rows="3"><?= html_escape((string) $modalRow['address']); ?></textarea></label>
-                        <label class="full">Catatan<textarea name="notes" rows="3"><?= html_escape((string) $modalRow['notes']); ?></textarea></label>
-                    </div>
-                    <div class="form-actions"><button type="submit">Simpan Penghuni</button></div>
-                </form>
-            </section>
-        </div>
-    <?php endforeach; ?>
+    <?php $this->load->view('manage/forms/tenants', array('modalRows' => array($emptyStay), 'rooms' => $rooms, 'properties' => $properties, 'room_types' => $room_types)); ?>
 
     <?php foreach ($rows as $stay): if (! $stay['tenant_id'] || ! in_array($stay['stay_status'], array('active','reserved'), TRUE)) continue; ?>
     <div class="modal wide" id="stay-contract-<?= (int) $stay['id']; ?>" aria-hidden="true"><div class="modal-backdrop" data-close-modal></div><section class="modal-card"><div class="modal-head"><h2>Draft Kontrak Penghuni Existing</h2><button type="button" data-close-modal>x</button></div>
@@ -358,6 +265,6 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js?v=20261020-admin-ui-1'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261021-pagination-1'); ?>"></script>
 </body>
 </html>

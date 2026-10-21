@@ -12,25 +12,63 @@ class Manage extends CI_Controller
         parent::__construct();
         $this->require_login();
         $this->load->model('Master_model');
+        $this->load->model('Master_table_model');
     }
 
     public function properties()
     {
-        $id = (int) $this->input->get('id');
-        $filters = array(
-            'type' => trim((string) $this->input->get('type', TRUE)),
-            'status' => trim((string) $this->input->get('status', TRUE)),
-            'q' => trim((string) $this->input->get('q', TRUE)),
-        );
+        $filters=$this->master_table_filters('properties');
+        $data=$this->Master_table_model->page('properties',$filters,$this->master_table_options());
+        $data=array_merge($data,array('title'=>'Properti | GUL HOUSE','admin_name'=>$this->session->userdata('gh_admin_name'),'filters'=>$filters,'region_data'=>$this->Master_model->get_region_catalog()));
+        $this->load->view('manage/properties',$data);
+    }
 
-        $this->load->view('manage/properties', array(
-            'title' => 'Properti | GUL HOUSE',
-            'region_data' => $this->Master_model->get_region_catalog(),
-            'admin_name' => $this->session->userdata('gh_admin_name'),
-            'rows' => $this->Master_model->get_properties($filters),
-            'filters' => $filters,
-            'edit' => $id > 0 ? $this->Master_model->get_property($id) : null,
-        ));
+    /** Fetch one edit form only after an authenticated click. */
+    public function master_form($resource,$id)
+    {
+        if (!in_array($resource,array('properties','room-types','rooms','tenants'),true)) { show_404();return; }
+        $row=$this->Master_table_model->find($resource,$id);
+        if (!$row) { show_404();return; }
+        $this->output->set_header('Cache-Control: private, no-store, max-age=0')->set_header('X-Content-Type-Options: nosniff');
+        $data=array('modalRows'=>array($row));
+        if(in_array($resource,array('properties','rooms'),true))$data['region_data']=$this->Master_model->get_region_catalog();
+        if(in_array($resource,array('rooms','tenants'),true)) {
+            $data['properties']=$this->Master_model->get_active_properties();
+            $data['room_types']=$this->Master_model->get_active_room_types();
+        }
+        if($resource==='tenants') {
+            $data['rooms']=$this->Master_model->get_active_rooms_for_stay();
+            $ids=array_map('intval',array_column($data['rooms'],'id'));
+            if(!in_array((int)$row['room_id'],$ids,true)) {
+                $current=$this->Master_table_model->find('rooms',$row['room_id']);
+                if($current)$data['rooms'][]=$current;
+            }
+        }
+        if(in_array($resource,array('rooms','tenants'),true)) {
+            $selected=$resource==='rooms'?$row:$this->Master_table_model->find('rooms',$row['room_id']);
+            if($selected) {
+                foreach(array('properties'=>array('property_id','get_property'),'room_types'=>array('room_type_id','get_room_type')) as $list=>$definition) {
+                    if(!in_array((int)$selected[$definition[0]],array_map('intval',array_column($data[$list],'id')),true)) {
+                        $saved=$this->Master_model->{$definition[1]}((int)$selected[$definition[0]]);
+                        if($saved)$data[$list][]=$saved;
+                    }
+                }
+            }
+        }
+        $this->load->view('manage/forms/'.str_replace('-','_',$resource),$data);
+    }
+
+    private function master_table_options()
+    {
+        $options=array();foreach(array('page','per_page','sort','dir') as $key)$options[$key]=$this->input->get($key);
+        return $options;
+    }
+
+    private function master_table_filters($resource)
+    {
+        $fields=array('properties'=>array('type','status','q'),'room-types'=>array('property_type','status','usage','q'),'rooms'=>array('property_id','room_type_id','status','public','q'),'tenants'=>array('property_id','room_type_id','room_id','stay_status','q'));
+        $out=array();foreach($fields[$resource] as $key){$value=$this->input->get($key,true);$value=is_scalar($value)?trim((string)$value):'';$out[$key]=substr($key,-3)==='_id'?(ctype_digit($value)?(int)$value:0):$value;}
+        return $out;
     }
 
     public function save_property()
@@ -89,21 +127,10 @@ class Manage extends CI_Controller
 
     public function room_types()
     {
-        $id = (int) $this->input->get('id');
-        $filters = array(
-            'property_type' => trim((string) $this->input->get('property_type', TRUE)),
-            'status' => trim((string) $this->input->get('status', TRUE)),
-            'usage' => trim((string) $this->input->get('usage', TRUE)),
-            'q' => trim((string) $this->input->get('q', TRUE)),
-        );
-
-        $this->load->view('manage/room_types', array(
-            'title' => 'Tipe Kamar | GUL HOUSE',
-            'admin_name' => $this->session->userdata('gh_admin_name'),
-            'rows' => $this->Master_model->get_room_types($filters),
-            'filters' => $filters,
-            'edit' => $id > 0 ? $this->Master_model->get_room_type($id) : null,
-        ));
+        $filters=$this->master_table_filters('room-types');
+        $data=$this->Master_table_model->page('room-types',$filters,$this->master_table_options());
+        $data=array_merge($data,array('title'=>'Tipe Kamar | GUL HOUSE','admin_name'=>$this->session->userdata('gh_admin_name'),'filters'=>$filters));
+        $this->load->view('manage/room_types',$data);
     }
 
     public function save_room_type()
@@ -139,26 +166,10 @@ class Manage extends CI_Controller
 
     public function rooms()
     {
-        $id = (int) $this->input->get('id');
-        $filters = array(
-            'property_id' => (int) $this->input->get('property_id'),
-            'room_type_id' => (int) $this->input->get('room_type_id'),
-            'status' => trim((string) $this->input->get('status', TRUE)),
-            'public' => trim((string) $this->input->get('public', TRUE)),
-            'q' => trim((string) $this->input->get('q', TRUE)),
-        );
-
-        $this->load->view('manage/rooms', array(
-            'title' => 'Kamar | GUL HOUSE',
-            'region_data' => $this->Master_model->get_region_catalog(),
-            'admin_name' => $this->session->userdata('gh_admin_name'),
-            'rows' => $this->Master_model->get_rooms($filters),
-            'room_catalog' => $this->Master_model->get_rooms(),
-            'properties' => $this->Master_model->get_active_properties(),
-            'room_types' => $this->Master_model->get_active_room_types(),
-            'filters' => $filters,
-            'edit' => $id > 0 ? $this->Master_model->get_room($id) : null,
-        ));
+        $filters=$this->master_table_filters('rooms');
+        $data=$this->Master_table_model->page('rooms',$filters,$this->master_table_options());
+        $data=array_merge($data,array('title'=>'Kamar | GUL HOUSE','admin_name'=>$this->session->userdata('gh_admin_name'),'filters'=>$filters,'region_data'=>$this->Master_model->get_region_catalog(),'room_catalog'=>$this->Master_table_model->room_filter_catalog(),'properties'=>$this->Master_model->get_active_properties(),'room_types'=>$this->Master_model->get_active_room_types()));
+        $this->load->view('manage/rooms',$data);
     }
 
     public function save_room()
@@ -465,23 +476,10 @@ class Manage extends CI_Controller
 
     public function tenants()
     {
-        $filters = array(
-            'property_id' => (int) $this->input->get('property_id'),
-            'room_type_id' => (int) $this->input->get('room_type_id'),
-            'room_id' => (int) $this->input->get('room_id'),
-            'stay_status' => trim((string) $this->input->get('stay_status', TRUE)),
-            'q' => trim((string) $this->input->get('q', TRUE)),
-        );
-
-        $this->load->view('manage/tenants', array(
-            'title' => 'Penghuni | GUL HOUSE',
-            'admin_name' => $this->session->userdata('gh_admin_name'),
-            'rows' => $this->Master_model->get_tenant_stays($filters),
-            'rooms' => $this->Master_model->get_active_rooms_for_stay(),
-            'properties' => $this->Master_model->get_active_properties(),
-            'room_types' => $this->Master_model->get_active_room_types(),
-            'filters' => $filters,
-        ));
+        $filters=$this->master_table_filters('tenants');
+        $data=$this->Master_table_model->page('tenants',$filters,$this->master_table_options());
+        $data=array_merge($data,array('title'=>'Penghuni | GUL HOUSE','admin_name'=>$this->session->userdata('gh_admin_name'),'filters'=>$filters,'rooms'=>$this->Master_model->get_active_rooms_for_stay(),'properties'=>$this->Master_model->get_active_properties(),'room_types'=>$this->Master_model->get_active_room_types()));
+        $this->load->view('manage/tenants',$data);
     }
 
     public function save_tenant()
