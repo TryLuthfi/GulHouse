@@ -265,6 +265,6 @@
         </section>
     </div>
 
-    <script src="<?= base_url('assets/master/js/master.js?v=20261021-pagination-1'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261021-modal-stack-1'); ?>"></script>
 </body>
 </html>

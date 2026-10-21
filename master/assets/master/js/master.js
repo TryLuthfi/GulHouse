@@ -1,6 +1,22 @@
 (function () {
     var pendingForm = null;
     var masterModalHeadingSequence = 0;
+    function raiseModal(modal) {
+        var opened = Array.prototype.slice.call(document.querySelectorAll('.modal.is-open')).filter(function (item) { return item !== modal; });
+        var highest = 40;
+        opened.forEach(function (item) {
+            var layer = Number(window.getComputedStyle(item).zIndex);
+            if (Number.isFinite(layer)) { highest = Math.max(highest, layer); }
+        });
+        // Normalize unexpected or exhausted layers before allocating the next one.
+        if (highest > 10000) {
+            opened.forEach(function (item, index) { item.style.zIndex = String(40 + index); });
+            highest = 40 + opened.length;
+        }
+        modal.style.zIndex = String(Math.min(highest + 1, 2147483000));
+        // Keep the DOM order aligned with the visual stack for the shared focus trap.
+        if (modal.parentNode === document.body) { document.body.appendChild(modal); }
+    }
     function openModal(modal, opener) {
         if (!modal) {
             return;
@@ -17,6 +33,7 @@
             }
             dialog.setAttribute('aria-labelledby', heading.id);
         }
+        raiseModal(modal);
         modal.classList.add('is-open');
         modal.setAttribute('aria-hidden', 'false');
         var focusTarget = modal.querySelector('input, select, textarea, button');
@@ -32,6 +49,7 @@
 
         modal.classList.remove('is-open');
         modal.setAttribute('aria-hidden', 'true');
+        modal.style.removeProperty('z-index');
         var opener = modal.__ghReturnFocus;
         if (opener && opener.isConnected && !opener.disabled) { opener.focus(); }
     }
@@ -68,7 +86,8 @@
                 return;
             }
 
-            document.querySelectorAll('.modal.is-open').forEach(closeModal);
+            var opened = document.querySelectorAll('.modal.is-open');
+            if (opened.length) { closeModal(opened[opened.length - 1]); }
         });
         document.documentElement.setAttribute('data-modal-escape-ready', 'true');
     }

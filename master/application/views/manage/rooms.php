@@ -208,6 +208,6 @@
 
     <script id="gh-region-data" type="application/json"><?= json_encode($region_data ?? array(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?></script>
     <script src="<?= base_url('assets/master/js/region-location.js?v=20261021-pagination-1'); ?>"></script>
-    <script src="<?= base_url('assets/master/js/master.js?v=20261021-pagination-1'); ?>"></script>
+    <script src="<?= base_url('assets/master/js/master.js?v=20261021-modal-stack-1'); ?>"></script>
 </body>
 </html>
